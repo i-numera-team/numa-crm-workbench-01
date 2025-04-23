@@ -1,3 +1,4 @@
+
 import { useAuth } from '@/contexts/AuthContext';
 import { mockDataService } from '@/utils/mockData';
 import { useState, useEffect } from 'react';
@@ -5,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 // Import graphique amélioré
 import { ChartContainer, ChartLegendContent, ChartTooltipContent } from '@/components/ui/chart';
-import { Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Bar, XAxis, YAxis, CartesianGrid, ComposedChart, ResponsiveContainer } from 'recharts';
 import { UserRole } from '@/utils/auth';
 import { File, FileCheck, FileX, FolderOpen, CreditCard, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 
@@ -92,12 +93,14 @@ function DashboardStats({ role }: { role: UserRole }) {
                   month: { label: "Mois", color: "#fff" }
                 }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fill: "#7A82AB" }} />
-                <YAxis tick={{ fill: "#7A82AB" }} />
-                <Bar dataKey="revenue" fill="#9b87f5" radius={[6, 6, 0, 0]} />
-                <ChartTooltipContent labelKey="month" />
-                <ChartLegendContent />
+                <ComposedChart data={mockDataService.getMonthlyRevenue()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" tick={{ fill: "#7A82AB" }} />
+                  <YAxis tick={{ fill: "#7A82AB" }} />
+                  <Bar dataKey="revenue" fill="#9b87f5" radius={[6, 6, 0, 0]} />
+                  <ChartTooltipContent labelKey="month" />
+                  <ChartLegendContent />
+                </ComposedChart>
               </ChartContainer>
             </div>
           </Card>
@@ -147,12 +150,14 @@ function DashboardStats({ role }: { role: UserRole }) {
                 month: { label: "Mois", color: "#fff" }
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" tick={{ fill: "#7A82AB" }} />
-              <YAxis tick={{ fill: "#7A82AB" }} />
-              <Bar dataKey="revenue" fill="#9b87f5" radius={[6, 6, 0, 0]} />
-              <ChartTooltipContent labelKey="month" />
-              <ChartLegendContent />
+              <ComposedChart data={mockDataService.getMonthlyRevenue()}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" tick={{ fill: "#7A82AB" }} />
+                <YAxis tick={{ fill: "#7A82AB" }} />
+                <Bar dataKey="revenue" fill="#9b87f5" radius={[6, 6, 0, 0]} />
+                <ChartTooltipContent labelKey="month" />
+                <ChartLegendContent />
+              </ComposedChart>
             </ChartContainer>
           </div>
         </Card>
@@ -393,3 +398,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
