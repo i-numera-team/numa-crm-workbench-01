@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,7 @@ import Layout from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
 import Cart from "./pages/Cart";
+import Quote from "./pages/Quote";
 import Dossiers from "./pages/Dossiers";
 import DossierDetail from "./pages/DossierDetail";
 import Quotes from "./pages/Quotes";
@@ -49,6 +49,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/marketplace" element={<Marketplace />} />
                 <Route path="/cart" element={<Cart />} />
+                <Route path="/quote" element={<Quote />} />
                 <Route path="/dossiers" element={<Dossiers />} />
                 <Route path="/dossiers/:id" element={<DossierDetail />} />
                 <Route path="/quotes" element={<Quotes />} />

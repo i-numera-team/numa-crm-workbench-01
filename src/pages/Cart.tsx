@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -49,6 +48,10 @@ export default function Cart() {
       setSelectedClient('');
     }
     setIsAgentView(!isAgentView);
+  };
+
+  const handleViewQuote = () => {
+    navigate('/quote');
   };
 
   const handleCreateQuote = () => {
@@ -233,6 +236,13 @@ export default function Cart() {
                   onClick={() => navigate('/marketplace')}
                 >
                   Continue Shopping
+                </Button>
+                
+                <Button
+                  className="flex-1 bg-numa-500 hover:bg-numa-600"
+                  onClick={handleViewQuote}
+                >
+                  View Quote
                 </Button>
                 
                 <Button
