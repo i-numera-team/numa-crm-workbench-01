@@ -29,7 +29,7 @@ export default function Sidebar() {
   const { pathname } = useLocation();
   const { userRole, logout } = useAuth();
   
-  // Hide sidebar on mobile by default
+  // Sidebar responsive
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const checkMobile = () => {
@@ -70,7 +70,7 @@ export default function Sidebar() {
       allowedRoles: ['client', 'agent', 'admin']
     },
     {
-      title: 'Mon Devis',
+      title: 'Mon devis',
       href: '/quotes',
       icon: <FileText className="h-5 w-5" />,
       allowedRoles: ['client', 'agent', 'admin']
@@ -99,7 +99,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Overlay mobile */}
       {!collapsed && isMobile && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-20"
@@ -110,13 +110,13 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen transition-all duration-300 z-30",
+          "bg-white dark:bg-[#181925] border-r border-gray-200 dark:border-[#222537] flex flex-col h-screen transition-all duration-300 z-30",
           collapsed ? "w-16 fixed" : isMobile ? "w-64 fixed" : "w-64 sticky top-0 left-0"
         )}
       >
-        {/* Logo and header */}
+        {/* Logo et entête */}
         <div className={cn(
-          "flex items-center h-16 px-4 border-b dark:border-gray-800",
+          "flex items-center h-16 px-4 border-b dark:border-[#222537]",
           collapsed ? "justify-center" : "justify-between"
         )}>
           {!collapsed && (
@@ -129,7 +129,7 @@ export default function Sidebar() {
           )}
           <button
             onClick={toggleSidebar}
-            className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900"
+            className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#222537]"
             aria-label={collapsed ? "Ouvrir le menu" : "Réduire le menu"}
           >
             {collapsed ? (
@@ -140,7 +140,7 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* Navigation items */}
+        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-2">
             {filteredNavItems.map((item) => {
@@ -154,7 +154,7 @@ export default function Sidebar() {
                       "flex items-center py-2 px-3 rounded-md transition-colors",
                       isActive
                         ? "bg-numa-100 text-numa-700 dark:bg-numa-600 dark:text-white"
-                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900",
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#222537]",
                       collapsed ? "justify-center" : "justify-start"
                     )}
                   >
@@ -169,15 +169,15 @@ export default function Sidebar() {
           </ul>
         </nav>
 
-        {/* Logout button */}
+        {/* Déconnexion */}
         <div className={cn(
-          "p-4 border-t dark:border-gray-800",
+          "p-4 border-t dark:border-[#222537]",
           collapsed ? "flex justify-center" : ""
         )}>
           <button
             onClick={logout}
             className={cn(
-              "flex items-center py-2 px-3 w-full rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors",
+              "flex items-center py-2 px-3 w-full rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#222537] transition-colors",
               collapsed ? "justify-center" : "justify-start"
             )}
           >
@@ -187,7 +187,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* Content spacer when sidebar is collapsed on desktop */}
+      {/* Spacer desktop */}
       {!isMobile && collapsed && (
         <div className="w-16 flex-shrink-0"></div>
       )}

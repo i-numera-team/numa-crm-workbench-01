@@ -15,7 +15,7 @@ export default function Header() {
   const { user, logout } = useAuth();
   const { totalItems } = useCart();
 
-  // Detection du mode sombre
+  // Dark mode state
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark' ||
       (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -34,7 +34,7 @@ export default function Header() {
   const toggleDarkMode = () => setDarkMode(m => !m);
 
   return (
-    <header className="h-16 border-b bg-white dark:bg-gray-900 flex items-center justify-between px-4 sticky top-0 z-10 shadow">
+    <header className="h-16 border-b bg-white dark:bg-[#1a1f2c] flex items-center justify-between px-4 sticky top-0 z-10 shadow">
       <div className="flex items-center lg:hidden">
         <Link to="/dashboard" className="flex items-center">
           <span className="font-extrabold text-xl select-none">
@@ -50,7 +50,7 @@ export default function Header() {
             type="search"
             placeholder="Rechercher…"
             aria-label="Rechercher"
-            className="w-full py-2 pl-10 pr-4 rounded-md border border-gray-300 dark:bg-gray-800 dark:border-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-numa-500 focus:border-numa-500"
+            className="w-full py-2 pl-10 pr-4 rounded-md border border-gray-300 dark:bg-[#181925] dark:border-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-numa-500 focus:border-numa-500"
           />
           <span className="absolute left-3 top-2.5 text-gray-400">
             <svg
@@ -75,17 +75,17 @@ export default function Header() {
         <button
           onClick={toggleDarkMode}
           title={darkMode ? "Passer en mode clair" : "Passer en mode sombre"}
-          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-[#222537] transition"
         >
           {darkMode
-            ? <Sun className="h-6 w-6 text-yellow-500" />
-            : <Moon className="h-6 w-6 text-gray-600" />
+            ? <Sun className="h-6 w-6 text-yellow-400" />
+            : <Moon className="h-6 w-6 text-white" />
           }
         </button>
         <Link to="/cart" className="relative p-2" title="Panier">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 text-gray-600 dark:text-gray-300"
+            className="h-6 w-6 text-gray-600 dark:text-white"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -104,7 +104,7 @@ export default function Header() {
           )}
         </Link>
         <button className="p-2 relative" title="Notifications">
-          <Bell className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+          <Bell className="h-6 w-6 text-gray-600 dark:text-white" />
           <span className="absolute top-0 right-0 bg-red-500 w-2.5 h-2.5 rounded-full"></span>
         </button>
         <DropdownMenu>
