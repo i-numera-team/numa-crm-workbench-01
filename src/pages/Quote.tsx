@@ -15,7 +15,6 @@ export default function Quote() {
   const { cartItems, totalPrice } = useCart();
   const { user } = useAuth();
   
-  // Transform cart items to line items
   const lineItems: LineItemType[] = cartItems.map(item => ({
     offre: item.offerTitle,
     description: item.offerTitle,
@@ -31,11 +30,11 @@ export default function Quote() {
   
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-white shadow-lg print:shadow-none">
+      <div className="w-full max-w-4xl bg-white shadow-lg print:shadow-none [&_*]:text-gray-900 dark:[&_*]:text-gray-900">
         <div className="p-8 print:p-0">
-          {/* Header Section */}
+          {/* Section En-tête */}
           <div className="relative mb-6 h-[300px] bg-no-repeat bg-cover bg-top" 
-          style={{ backgroundImage: "url('/images/inum.png')" }}>
+               style={{ backgroundImage: "url('/images/inum.png')" }}>
             <div className="left-[100px] top-[100px] bg text-white p-4 rounded-t-md relative items-center">
               <h1 className="text-xl font-bold text-[25px]">Devis n° {Math.floor(Math.random() * 10000).toString().padStart(7, '0')}</h1>
             </div>
@@ -54,7 +53,7 @@ export default function Quote() {
             </div>
           </div>
 
-          {/* Client Info Section */}
+          {/* Section Informations Client */}
           <div className="mb-6">
             <div className="flex flex-col">
               <h2 className="font-bold text-base">Client: {user?.name}</h2>
@@ -64,9 +63,9 @@ export default function Quote() {
             </div>
           </div>
 
-          {/* Line Items Cards */}
+          {/* Éléments du devis */}
           <div className="mb-6 space-y-4">
-            {/* Header */}
+            {/* En-tête */}
             <div className="flex items-center mb-4 rounded-xl border-[2px] border-red-400">
               <div className="w-1/6 py-7 px-4 text-left text-xs font-bold">Offre</div>
               <div className="w-2/6 py-7 px-4 text-left text-xs font-bold">Description de l'offre</div>
@@ -75,7 +74,7 @@ export default function Quote() {
               <div className="w-1/6 py-7 px-4 text-right text-xs font-bold">Quantité</div>
             </div>
 
-            {/* Body */}
+            {/* Corps */}
             {lineItems.map((item, index) => (
               <div key={index} className="flex items-center border-[2px] border-gray-400 rounded-md">
                 <div className="w-1/6 py-2 px-4 text-xs">{item.offre}</div>
@@ -86,19 +85,19 @@ export default function Quote() {
               </div>
             ))}
 
-            {/* Footer */}
+            {/* Pied */}
             <div className="flex items-center border border-gray-400 rounded-md">
               <div className="w-5/6 py-2 px-4 text-right text-xs font-bold border-r border-gray-400">Total HT</div>
               <div className="w-1/6 py-2 px-4 text-right text-xs font-bold">{totalPrice}€ HT</div>
             </div>
           </div>
 
-          {/* Total Section */}
+          {/* Section Total */}
           <div className="mb-6">
             <div className="flex flex-col items-end">
               <div className="w-1/3">
                 <div className="flex justify-between py-1">
-                  <span className="text-sm">Subtotal</span>
+                  <span className="text-sm">Total HT</span>
                   <span className="text-sm font-semibold">{totalPrice}€ HT</span>
                 </div>
                 <div className="flex justify-between py-1">
@@ -106,14 +105,14 @@ export default function Quote() {
                   <span className="text-sm font-semibold">{tva}€</span>
                 </div>
                 <div className="flex justify-between py-2 mt-1 bg-[#c41c28] text-white font-bold rounded">
-                  <span className="text-sm ml-2">Total</span>
+                  <span className="text-sm ml-2">Total TTC</span>
                   <span className="text-sm mr-2">{totalTTC}€ TTC</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Payment Info and Signature Section */}
+          {/* Section Paiement et Signature */}
           <div className="flex justify-between">
             <div className="w-1/2">
               <div className="mb-6">
@@ -132,10 +131,10 @@ export default function Quote() {
             
             <div className="w-1/3 border border-red-400 rounded-md p-4">
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-600">Date: {currentDate}</span>
+                <span className="text-sm text-gray-600">Date : {currentDate}</span>
               </div>
               <div className="border-b pb-20 border-gray-400 pt-2">
-                <span className="text-sm text-gray-600">Signature:</span>
+                <span className="text-sm text-gray-600">Signature :</span>
               </div>
             </div>
           </div>
