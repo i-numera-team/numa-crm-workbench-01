@@ -1,4 +1,3 @@
-
 import { User, UserRole } from './auth';
 
 export interface Offer {
@@ -763,6 +762,47 @@ class MockDataService {
     };
   }
 
+  // Get monthly revenue data for charts
+  getMonthlyRevenue(): { month: string; revenue: number }[] {
+    const quotes = this.getQuotes();
+    const signedQuotes = quotes.filter(q => q.status === 'signed');
+    
+    // Create a map to store revenue by month
+    const monthlyRevenueMap = new Map<string, number>();
+    
+    // French month names
+    const frenchMonthNames = [
+      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'
+    ];
+    
+    // Get current year
+    const currentYear = new Date().getFullYear();
+    
+    // Initialize all months with zero revenue
+    for (let i = 0; i < 12; i++) {
+      monthlyRevenueMap.set(frenchMonthNames[i], 0);
+    }
+    
+    // Add revenue from signed quotes
+    signedQuotes.forEach(quote => {
+      const signedAt = quote.signedAt ? new Date(quote.signedAt) : null;
+      if (signedAt && signedAt.getFullYear() === currentYear) {
+        const monthName = frenchMonthNames[signedAt.getMonth()];
+        const currentRevenue = monthlyRevenueMap.get(monthName) || 0;
+        monthlyRevenueMap.set(monthName, currentRevenue + quote.totalPrice);
+      }
+    });
+    
+    // Convert map to array
+    return Array.from(monthlyRevenueMap.entries())
+      .map(([month, revenue]) => ({ month, revenue }))
+      .sort((a, b) => {
+        // Sort by month order
+        return frenchMonthNames.indexOf(a.month) - frenchMonthNames.indexOf(b.month);
+      });
+  }
+
   // Get recent activities
   getActivities(limit: number = 10): Activity[] {
     const activities = this.getInitialActivities();
@@ -773,18 +813,4 @@ class MockDataService {
   
   // Add activity
   private addActivity(activity: Omit<Activity, 'id' | 'createdAt'>): Activity {
-    const activities = this.getInitialActivities();
-    
-    const newActivity: Activity = {
-      ...activity,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    
-    activities.push(newActivity);
-    localStorage.setItem(this.ACTIVITIES_KEY, JSON.stringify(activities));
-    return newActivity;
-  }
-}
-
-export const mockDataService = new MockDataService();
+    const activities = this.get
