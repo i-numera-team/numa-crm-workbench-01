@@ -46,7 +46,7 @@ export default function Sidebar() {
 
   const navItems: NavItem[] = [
     {
-      title: 'Dashboard',
+      title: 'Tableau de bord',
       href: '/dashboard',
       icon: <Home className="h-5 w-5" />,
       allowedRoles: ['client', 'agent', 'admin']
@@ -58,7 +58,7 @@ export default function Sidebar() {
       allowedRoles: ['client', 'agent', 'admin']
     },
     {
-      title: 'Cart',
+      title: 'Panier',
       href: '/cart',
       icon: <ShoppingCart className="h-5 w-5" />,
       allowedRoles: ['client', 'agent', 'admin']
@@ -70,19 +70,19 @@ export default function Sidebar() {
       allowedRoles: ['client', 'agent', 'admin']
     },
     {
-      title: 'Quotes',
+      title: 'Mon Devis',
       href: '/quotes',
       icon: <FileText className="h-5 w-5" />,
       allowedRoles: ['client', 'agent', 'admin']
     },
     {
-      title: 'User Management',
+      title: 'Utilisateurs',
       href: '/users',
       icon: <Users className="h-5 w-5" />,
       allowedRoles: ['admin']
     },
     {
-      title: 'Settings',
+      title: 'Paramètres',
       href: '/settings',
       icon: <Settings className="h-5 w-5" />,
       allowedRoles: ['admin']
@@ -110,28 +110,32 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "bg-white border-r border-gray-200 flex flex-col h-screen transition-all duration-300 z-30",
+          "bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen transition-all duration-300 z-30",
           collapsed ? "w-16 fixed" : isMobile ? "w-64 fixed" : "w-64 sticky top-0 left-0"
         )}
       >
         {/* Logo and header */}
         <div className={cn(
-          "flex items-center h-16 px-4 border-b",
+          "flex items-center h-16 px-4 border-b dark:border-gray-800",
           collapsed ? "justify-center" : "justify-between"
         )}>
           {!collapsed && (
-            <Link to="/dashboard" className="flex items-center">
-              <span className="font-bold text-xl text-numa-500">i-numa</span>
+            <Link to="/dashboard" className="flex items-center select-none">
+              <span className="font-extrabold text-xl">
+                <span style={{color:'#ea384c'}}>i</span>
+                <span style={{color:'#1EAEDB'}}>numa</span>
+              </span>
             </Link>
           )}
           <button
             onClick={toggleSidebar}
-            className="p-2 rounded-md hover:bg-gray-100"
+            className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900"
+            aria-label={collapsed ? "Ouvrir le menu" : "Réduire le menu"}
           >
             {collapsed ? (
-              <ChevronRight className="h-5 w-5 text-gray-600" />
+              <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-300" />
             ) : (
-              <ChevronLeft className="h-5 w-5 text-gray-600" />
+              <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
             )}
           </button>
         </div>
@@ -149,8 +153,8 @@ export default function Sidebar() {
                     className={cn(
                       "flex items-center py-2 px-3 rounded-md transition-colors",
                       isActive
-                        ? "bg-numa-100 text-numa-700"
-                        : "text-gray-700 hover:bg-gray-100",
+                        ? "bg-numa-100 text-numa-700 dark:bg-numa-600 dark:text-white"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900",
                       collapsed ? "justify-center" : "justify-start"
                     )}
                   >
@@ -167,18 +171,18 @@ export default function Sidebar() {
 
         {/* Logout button */}
         <div className={cn(
-          "p-4 border-t",
+          "p-4 border-t dark:border-gray-800",
           collapsed ? "flex justify-center" : ""
         )}>
           <button
             onClick={logout}
             className={cn(
-              "flex items-center py-2 px-3 w-full rounded-md text-gray-700 hover:bg-gray-100 transition-colors",
+              "flex items-center py-2 px-3 w-full rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors",
               collapsed ? "justify-center" : "justify-start"
             )}
           >
             <LogOut className="h-5 w-5" />
-            {!collapsed && <span className="ml-3 text-sm font-medium">Logout</span>}
+            {!collapsed && <span className="ml-3 text-sm font-medium">Déconnexion</span>}
           </button>
         </div>
       </aside>

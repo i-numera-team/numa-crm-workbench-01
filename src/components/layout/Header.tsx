@@ -1,6 +1,6 @@
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell, User } from 'lucide-react';
+import { Bell, User, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { 
@@ -9,16 +9,38 @@ import {
   DropdownMenuContent,
   DropdownMenuItem
 } from '@/components/ui/dropdown-menu';
+import { useState, useEffect } from 'react';
 
 export default function Header() {
   const { user, logout } = useAuth();
   const { totalItems } = useCart();
 
+  // Detection du mode sombre
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('theme') === 'dark' ||
+      (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode(m => !m);
+
   return (
-    <header className="h-16 border-b bg-white flex items-center justify-between px-4 sticky top-0 z-10">
+    <header className="h-16 border-b bg-white dark:bg-gray-900 flex items-center justify-between px-4 sticky top-0 z-10 shadow">
       <div className="flex items-center lg:hidden">
         <Link to="/dashboard" className="flex items-center">
-          <span className="font-bold text-xl text-numa-500">i-numa</span>
+          <span className="font-extrabold text-xl select-none">
+            <span style={{color:'#ea384c'}}>i</span>
+            <span style={{color:'#1EAEDB'}}>numa</span>
+          </span>
         </Link>
       </div>
       
@@ -26,8 +48,9 @@ export default function Header() {
         <div className="relative">
           <input
             type="search"
-            placeholder="Search..."
-            className="w-full py-2 pl-10 pr-4 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-numa-500 focus:border-numa-500"
+            placeholder="Rechercher…"
+            aria-label="Rechercher"
+            className="w-full py-2 pl-10 pr-4 rounded-md border border-gray-300 dark:bg-gray-800 dark:border-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-numa-500 focus:border-numa-500"
           />
           <span className="absolute left-3 top-2.5 text-gray-400">
             <svg
@@ -49,10 +72,20 @@ export default function Header() {
       </div>
 
       <div className="flex items-center space-x-4">
-        <Link to="/cart" className="relative p-2">
+        <button
+          onClick={toggleDarkMode}
+          title={darkMode ? "Passer en mode clair" : "Passer en mode sombre"}
+          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+        >
+          {darkMode
+            ? <Sun className="h-6 w-6 text-yellow-500" />
+            : <Moon className="h-6 w-6 text-gray-600" />
+          }
+        </button>
+        <Link to="/cart" className="relative p-2" title="Panier">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 text-gray-600"
+            className="h-6 w-6 text-gray-600 dark:text-gray-300"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -70,39 +103,43 @@ export default function Header() {
             </span>
           )}
         </Link>
-        
-        <button className="p-2 relative">
-          <Bell className="h-6 w-6 text-gray-600" />
+        <button className="p-2 relative" title="Notifications">
+          <Bell className="h-6 w-6 text-gray-600 dark:text-gray-300" />
           <span className="absolute top-0 right-0 bg-red-500 w-2.5 h-2.5 rounded-full"></span>
         </button>
-        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center space-x-2">
               <div className="w-8 h-8 rounded-full bg-numa-100 flex items-center justify-center">
                 <User className="h-5 w-5 text-numa-500" />
               </div>
-              <span className="text-sm font-medium hidden md:inline-block">
-                {user?.name || 'User'}
+              <span className="text-sm font-medium hidden md:inline-block dark:text-white">
+                {user?.name || 'Utilisateur'}
               </span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <div className="p-2 border-b">
               <p className="font-medium">{user?.name}</p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-300">{user?.email}</p>
               <div className="mt-1 text-xs px-1.5 py-0.5 bg-numa-100 text-numa-700 rounded-full w-fit">
-                {user?.role.charAt(0).toUpperCase() + user?.role.slice(1)}
+                {user?.role
+                  ? user.role === 'client'
+                    ? 'Client'
+                    : user.role === 'agent'
+                      ? 'Agent'
+                      : 'Administrateur'
+                  : ''}
               </div>
             </div>
             <DropdownMenuItem asChild>
-              <Link to="/profile" className="cursor-pointer">My Profile</Link>
+              <Link to="/profile" className="cursor-pointer">Mon Profil</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/settings" className="cursor-pointer">Settings</Link>
+              <Link to="/settings" className="cursor-pointer">Paramètres</Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={logout} className="text-red-600 cursor-pointer">
-              Log out
+              Déconnexion
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
