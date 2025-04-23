@@ -1,3 +1,4 @@
+
 import { User, UserRole } from './auth';
 
 export interface Offer {
@@ -813,4 +814,18 @@ class MockDataService {
   
   // Add activity
   private addActivity(activity: Omit<Activity, 'id' | 'createdAt'>): Activity {
-    const activities = this.get
+    const activities = this.getInitialActivities();
+    
+    const newActivity: Activity = {
+      ...activity,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    
+    activities.push(newActivity);
+    localStorage.setItem(this.ACTIVITIES_KEY, JSON.stringify(activities));
+    return newActivity;
+  }
+}
+
+export const mockDataService = new MockDataService();
