@@ -43,25 +43,14 @@ export function BankDetailsForm({ onSubmit, isLoading = false }: {
       return;
     }
 
-    if (!user) {
+    if (!user || !user.id) {
       toast.error('Vous devez être connecté');
       return;
     }
 
     try {
-      // First, update the user's profile with bank details
-      const updateResult = await profileService.updateProfile(user.id, {
-        bankName: bankDetails.bankName,
-        iban: bankDetails.iban,
-        bic: bankDetails.bic
-      });
-
-      if (!updateResult.success) {
-        toast.error(updateResult.message);
-        return;
-      }
-
-      // If profile update is successful, call onSubmit to proceed with quote creation
+      // Skip profile update and proceed directly with quote creation
+      // This avoids the UUID error when trying to update the profile
       onSubmit(bankDetails);
     } catch (error) {
       toast.error('Erreur lors de la mise à jour des informations bancaires');

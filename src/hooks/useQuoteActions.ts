@@ -67,7 +67,7 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
   };
 
   const handleBankDetailsSubmit = async (bankDetails: BankDetails) => {
-    if (!user) {
+    if (!user || !user.id) {
       toast.error('Vous devez être connecté pour continuer');
       return;
     }
@@ -79,11 +79,17 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       let dossierId;
       
       // Try to fetch an existing dossier for the current user
-      const { data: existingDossiers } = await supabase
+      // Use the actual UUID from the user object
+      const { data: existingDossiers, error: fetchError } = await supabase
         .from('dossiers')
         .select('id')
         .eq('client_id', user.id)
         .limit(1);
+      
+      if (fetchError) {
+        console.error('Error fetching dossiers:', fetchError);
+        throw new Error(`Erreur lors de la récupération du dossier: ${fetchError.message}`);
+      }
       
       // Use existing dossier if available, otherwise create a new one
       if (existingDossiers && existingDossiers.length > 0) {
@@ -100,13 +106,14 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
           .single();
           
         if (dossierError) {
+          console.error('Error creating dossier:', dossierError);
           throw new Error(`Erreur lors de la création du dossier: ${dossierError.message}`);
         }
         
         dossierId = newDossier.id;
       }
       
-      // Now create the quote with a valid dossier_id
+      // Now create the quote with the valid dossier_id
       const { data: quote, error } = await supabase
         .from('quotes')
         .insert([
