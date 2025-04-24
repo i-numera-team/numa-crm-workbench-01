@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, UserRole } from "@/types/auth";
 import { toast } from 'sonner';
 
-// Storage service
-class StorageService {
+// Auth service
+export class AuthService {
   private readonly STORAGE_KEY = 'i-numa-auth';
 
   getCurrentUser(): User | null {
@@ -18,19 +18,6 @@ class StorageService {
     } else {
       localStorage.removeItem(this.STORAGE_KEY);
     }
-  }
-}
-
-// Auth service
-export class AuthService {
-  private storage: StorageService;
-
-  constructor() {
-    this.storage = new StorageService();
-  }
-
-  getCurrentUser(): User | null {
-    return this.storage.getCurrentUser();
   }
 
   async login(email: string, password: string): Promise<{ success: boolean; message: string }> {
@@ -70,12 +57,19 @@ export class AuthService {
         phone: profileData.phone
       };
       
-      this.storage.setCurrentUser(userData);
+      this.setCurrentUser(userData);
       return { success: true, message: 'Connexion réussie' };
     } catch (err) {
       console.error('Login exception:', err);
       return { success: false, message: 'Une erreur est survenue' };
     }
+  }
+
+  logout(): void {
+    supabase.auth.signOut().catch(error => {
+      console.error('Logout error:', error);
+    });
+    this.setCurrentUser(null);
   }
 }
 

@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { UserRole } from '@/utils/auth';
+import { UserRole } from '@/types/auth';
 import { toast } from 'sonner';
 
 export default function Quotes() {

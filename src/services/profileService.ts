@@ -28,7 +28,7 @@ export class ProfileService {
           ...currentUser,
           ...profileData
         };
-        new StorageService().setCurrentUser(updatedUser);
+        authService.setCurrentUser(updatedUser);
       }
       
       return { success: true, message: 'Profil mis à jour avec succès' };

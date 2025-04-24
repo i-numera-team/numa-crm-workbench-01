@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserRole } from '@/utils/auth';
+import { UserRole } from '@/types/auth';
 import { 
   Home, 
   ShoppingBag, 

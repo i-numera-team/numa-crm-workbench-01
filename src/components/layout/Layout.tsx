@@ -3,7 +3,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, Outlet } from 'react-router-dom';
-import { UserRole } from '@/utils/auth';
+import { UserRole } from '@/types/auth';
 
 interface ProtectedLayoutProps {
   allowedRoles?: UserRole[];

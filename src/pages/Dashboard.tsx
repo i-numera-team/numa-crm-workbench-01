@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 // Import graphique amélioré
 import { ChartContainer, ChartLegendContent, ChartTooltipContent } from '@/components/ui/chart';
 import { Bar, XAxis, YAxis, CartesianGrid, ComposedChart, ResponsiveContainer } from 'recharts';
-import { UserRole } from '@/utils/auth';
+import { UserRole } from '@/types/auth';
 import { File, FileCheck, FileX, FolderOpen, CreditCard, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 
 // Statistiques selon le rôle utilisateur

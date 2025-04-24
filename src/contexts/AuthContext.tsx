@@ -1,14 +1,16 @@
 
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { authService, User, UserRole } from '../utils/auth';
 import { toast } from 'sonner';
+import { User, UserRole } from '@/types/auth';
+import { authService } from '@/services';
+import { registrationService } from '@/services';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, company?: string) => Promise<void>;
-  verifyEmail: (email: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  register: (name: string, email: string, password: string, birthdate: string, phone: string) => Promise<{ success: boolean; message: string }>;
+  verifyEmail: (email: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   isAuthenticated: boolean;
   userRole: UserRole | null;
@@ -40,45 +42,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         toast.error(result.message);
       }
+      setIsLoading(false);
+      return result;
     } catch (error) {
       toast.error('An error occurred during login');
       console.error(error);
-    } finally {
       setIsLoading(false);
+      return { success: false, message: 'An error occurred during login' };
     }
   };
 
-  const register = async (name: string, email: string, password: string, company?: string) => {
+  const register = async (name: string, email: string, password: string, birthdate: string, phone: string) => {
     setIsLoading(true);
     try {
-      const result = await authService.register(name, email, password, company);
+      const result = await registrationService.register(name, email, password, birthdate, phone);
       if (result.success) {
         toast.success(result.message);
       } else {
         toast.error(result.message);
       }
+      setIsLoading(false);
+      return result;
     } catch (error) {
       toast.error('An error occurred during registration');
       console.error(error);
-    } finally {
       setIsLoading(false);
+      return { success: false, message: 'An error occurred during registration' };
     }
   };
 
   const verifyEmail = async (email: string) => {
     setIsLoading(true);
     try {
-      const result = await authService.verifyEmail(email);
+      const result = await registrationService.verifyEmail(email);
       if (result.success) {
         toast.success(result.message);
       } else {
         toast.error(result.message);
       }
+      setIsLoading(false);
+      return result;
     } catch (error) {
       toast.error('An error occurred during email verification');
       console.error(error);
-    } finally {
       setIsLoading(false);
+      return { success: false, message: 'An error occurred during email verification' };
     }
   };
 
