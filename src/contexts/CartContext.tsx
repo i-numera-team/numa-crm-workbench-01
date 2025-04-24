@@ -1,12 +1,12 @@
 
 import { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { mockDataService, CartItem, Offer } from '../utils/mockData';
+import { mockDataService, CartItem } from '../utils/mockData';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 
 interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (offer: Offer, quantity?: number) => void;
+  addToCart: (item: CartItem) => void;
   updateQuantity: (offerId: string, quantity: number) => void;
   removeFromCart: (offerId: string) => void;
   clearCart: () => void;
@@ -30,22 +30,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const addToCart = (offer: Offer, quantity: number = 1) => {
+  const addToCart = (item: CartItem) => {
     if (!user) {
       toast.error('Please log in to add items to cart');
       return;
     }
 
-    const item: CartItem = {
-      offerId: offer.id,
-      offerTitle: offer.title,
-      price: offer.price,
-      quantity
-    };
-
     const updatedCart = mockDataService.addToCart(user.id, item);
     setCartItems(updatedCart);
-    toast.success(`${offer.title} added to cart`);
+    toast.success(`${item.offerTitle} added to cart`);
   };
 
   const updateQuantity = (offerId: string, quantity: number) => {

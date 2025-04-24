@@ -86,9 +86,8 @@ class AuthService {
         email: data.user.email || '',
         role: userProfile.role as UserRole,
         isEmailVerified: data.user.email_confirmed_at !== null,
-        // Add type checks for optional properties
-        company: 'company' in userProfile ? userProfile.company || undefined : undefined,
-        phone: 'phone' in userProfile ? userProfile.phone || undefined : undefined
+        company: typeof userProfile === 'object' && 'company' in userProfile ? userProfile.company || undefined : undefined,
+        phone: typeof userProfile === 'object' && 'phone' in userProfile ? userProfile.phone || undefined : undefined
       };
       
       this.setCurrentUser(userData);
@@ -122,7 +121,8 @@ class AuthService {
         return { success: false, message: 'Erreur lors de la création du compte' };
       }
       
-      // Create profile for new user
+      // Create profile for new user with public access
+      await supabase.auth.getSession();
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -133,7 +133,8 @@ class AuthService {
         
       if (profileError) {
         console.error('Error creating profile:', profileError);
-        return { success: false, message: 'Erreur lors de la création du profil' };
+        console.log('User ID:', data.user.id);
+        return { success: false, message: 'Erreur lors de la création du profil. Veuillez contacter le support.' };
       }
       
       return { 
