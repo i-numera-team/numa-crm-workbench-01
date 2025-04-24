@@ -1,9 +1,10 @@
-
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 interface LineItemType {
   offre: string;
@@ -18,6 +19,7 @@ export default function Quote() {
   const { user } = useAuth();
   const [offers, setOffers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
   
   useEffect(() => {
     async function fetchOffers() {
@@ -46,9 +48,9 @@ export default function Quote() {
     fetchOffers();
   }, []);
   
-  const lineItems: LineItemType[] = cartItems.map(item => ({
+  const lineItems = cartItems.map(item => ({
     offre: item.offerTitle,
-    description: item.offerTitle,
+    description: offers.find(offer => offer.id === item.offerId)?.description || item.offerTitle,
     prix: item.price,
     quantite: item.quantity,
     montant: item.price * item.quantity
@@ -58,12 +60,41 @@ export default function Quote() {
   const totalTTC = totalPrice + tva;
   
   const currentDate = new Date().toLocaleDateString('fr-FR');
+
+  const handleAcceptQuote = async () => {
+    if (!user) {
+      toast.error('Vous devez être connecté pour accepter un devis');
+      return;
+    }
+
+    try {
+      const { data: quote, error } = await supabase
+        .from('quotes')
+        .insert([
+          {
+            dossier_id: '1',
+            status: 'pending_admin',
+            total_price: totalTTC,
+            description: 'Devis en attente de confirmation administrative'
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Devis envoyé pour approbation administrative');
+      navigate('/quotes');
+    } catch (error) {
+      console.error('Error accepting quote:', error);
+      toast.error('Erreur lors de l\'envoi du devis');
+    }
+  };
   
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl bg-white shadow-lg print:shadow-none [&_*]:text-gray-900 dark:[&_*]:text-gray-900">
         <div className="p-8 print:p-0">
-          {/* Section En-tête */}
           <div className="relative mb-6 h-[300px] bg-no-repeat bg-cover bg-top" 
                style={{ backgroundImage: "url('/images/inum.png')" }}>
             <div className="left-[100px] top-[100px] bg text-white p-4 rounded-t-md relative items-center">
@@ -84,7 +115,6 @@ export default function Quote() {
             </div>
           </div>
 
-          {/* Section Informations Client */}
           <div className="mb-6">
             <div className="flex flex-col">
               <h2 className="font-bold text-base">Client: {user?.name}</h2>
@@ -94,9 +124,7 @@ export default function Quote() {
             </div>
           </div>
 
-          {/* Éléments du devis */}
           <div className="mb-6 space-y-4">
-            {/* En-tête */}
             <div className="flex items-center mb-4 rounded-xl border-[2px] border-red-400">
               <div className="w-1/6 py-7 px-4 text-left text-xs font-bold">Offre</div>
               <div className="w-2/6 py-7 px-4 text-left text-xs font-bold">Description de l'offre</div>
@@ -105,7 +133,6 @@ export default function Quote() {
               <div className="w-1/6 py-7 px-4 text-right text-xs font-bold">Quantité</div>
             </div>
 
-            {/* Corps */}
             {lineItems.map((item, index) => (
               <div key={index} className="flex items-center border-[2px] border-gray-400 rounded-md">
                 <div className="w-1/6 py-2 px-4 text-xs">{item.offre}</div>
@@ -116,14 +143,12 @@ export default function Quote() {
               </div>
             ))}
 
-            {/* Pied */}
             <div className="flex items-center border border-gray-400 rounded-md">
               <div className="w-5/6 py-2 px-4 text-right text-xs font-bold border-r border-gray-400">Total HT</div>
               <div className="w-1/6 py-2 px-4 text-right text-xs font-bold">{totalPrice}€ HT</div>
             </div>
           </div>
 
-          {/* Section Total */}
           <div className="mb-6">
             <div className="flex flex-col items-end">
               <div className="w-1/3">
@@ -143,7 +168,6 @@ export default function Quote() {
             </div>
           </div>
 
-          {/* Section Paiement et Signature */}
           <div className="flex justify-between">
             <div className="w-1/2">
               <div className="mb-6">
@@ -168,6 +192,22 @@ export default function Quote() {
                 <span className="text-sm text-gray-600">Signature :</span>
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-4">
+            <Button 
+              variant="outline" 
+              onClick={() => window.print()}
+              className="print:hidden"
+            >
+              Télécharger le PDF
+            </Button>
+            <Button 
+              onClick={handleAcceptQuote}
+              className="bg-green-600 hover:bg-green-700 text-white print:hidden"
+            >
+              Accepter le devis
+            </Button>
           </div>
         </div>
       </div>
