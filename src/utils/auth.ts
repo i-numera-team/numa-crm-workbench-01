@@ -65,6 +65,7 @@ class AuthService {
             .from('profiles')
             .insert({
               id: data.user.id,
+              email: data.user.email || '',  // Ajout de l'email
               role: 'client'
             });
             
@@ -127,6 +128,7 @@ class AuthService {
         .from('profiles')
         .insert({
           id: data.user.id,
+          email: email,  // Ajout de l'email
           company,
           role: 'client'
         });
