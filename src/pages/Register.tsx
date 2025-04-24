@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -41,13 +41,15 @@ export default function Register() {
         formData.fullName,
         formData.email,
         formData.password,
-        undefined,
         formData.birthdate,
         formData.phone
       );
       
       if (result.success) {
+        toast.success(result.message);
         navigate('/login');
+      } else {
+        toast.error(result.message);
       }
     } finally {
       setIsSubmitting(false);

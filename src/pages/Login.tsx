@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -22,6 +23,9 @@ export default function Login() {
       const result = await login(email, password);
       if (result.success) {
         navigate('/dashboard');
+        toast.success('Connexion réussie');
+      } else {
+        toast.error(result.message);
       }
     } finally {
       setIsSubmitting(false);
