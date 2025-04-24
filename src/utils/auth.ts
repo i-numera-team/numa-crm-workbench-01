@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
 
@@ -50,7 +49,6 @@ class AuthService {
         return { success: false, message: 'Utilisateur non trouvé' };
       }
       
-      // Get user profile from the profiles table
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -59,36 +57,17 @@ class AuthService {
       
       if (profileError) {
         console.error('Error fetching profile:', profileError);
-        // If there's no profile, create one with default values
-        if (profileError.code === 'PGRST116') {
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              email: data.user.email || '',  // Ajout de l'email
-              role: 'client'
-            });
-            
-          if (insertError) {
-            console.error('Error creating profile:', insertError);
-            return { success: false, message: 'Erreur lors de la création du profil' };
-          }
-        } else {
-          return { success: false, message: 'Erreur lors de la récupération du profil' };
-        }
+        return { success: false, message: 'Erreur lors de la récupération du profil' };
       }
       
-      const userProfile = profileData || { role: 'client' };
-      
-      // Create user data to save in localStorage
       const userData: User = {
         id: data.user.id,
         name: data.user.user_metadata.name || data.user.email?.split('@')[0] || '',
         email: data.user.email || '',
-        role: userProfile.role as UserRole,
+        role: profileData.role as UserRole,
         isEmailVerified: data.user.email_confirmed_at !== null,
-        company: typeof userProfile === 'object' && 'company' in userProfile ? userProfile.company || undefined : undefined,
-        phone: typeof userProfile === 'object' && 'phone' in userProfile ? userProfile.phone || undefined : undefined
+        company: profileData.company,
+        phone: profileData.phone
       };
       
       this.setCurrentUser(userData);
@@ -100,15 +79,21 @@ class AuthService {
   }
   
   // Register new user with Supabase
-  async register(name: string, email: string, password: string, company?: string): Promise<{ success: boolean; message: string }> {
+  async register(
+    name: string, 
+    email: string, 
+    password: string, 
+    company?: string,
+    birthdate?: string,
+    phone?: string
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name,
-            company
+            name
           }
         }
       });
@@ -122,21 +107,22 @@ class AuthService {
         return { success: false, message: 'Erreur lors de la création du compte' };
       }
       
-      // Create profile for new user with public access
-      await supabase.auth.getSession();
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: data.user.id,
-          email: email,  // Ajout de l'email
+          email: email,
           company,
-          role: 'client'
+          role: 'client',
+          birthdate: birthdate ? new Date(birthdate) : null,
+          phone,
+          email_confirmed: false,
+          email_confirmation_token: data.user.confirmation_token
         });
         
       if (profileError) {
         console.error('Error creating profile:', profileError);
-        console.log('User ID:', data.user.id);
-        return { success: false, message: 'Erreur lors de la création du profil. Veuillez contacter le support.' };
+        return { success: false, message: 'Erreur lors de la création du profil' };
       }
       
       return { 

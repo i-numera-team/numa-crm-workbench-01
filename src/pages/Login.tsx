@@ -1,24 +1,28 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      if (result.success) {
+        navigate('/dashboard');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -86,24 +90,13 @@ export default function Login() {
             </form>
           </CardContent>
           
-          <CardFooter className="flex flex-col space-y-4 pb-6">
-            <p className="text-sm text-gray-600 text-center">
+          <CardFooter className="flex justify-center pb-6">
+            <p className="text-sm text-gray-600">
               Vous n'avez pas de compte ?{' '}
               <Link to="/register" className="text-numa-500 hover:underline">
                 S'inscrire
               </Link>
             </p>
-            
-            <div className="border-t pt-4 w-full">
-              <p className="text-xs text-gray-500 text-center mb-2">
-                Comptes de démonstration :
-              </p>
-              <div className="space-y-1 text-xs text-gray-500 text-center">
-                <p>Admin : admin@inuma.com / password</p>
-                <p>Agent : agent@inuma.com / password</p>
-                <p>Client : client@inuma.com / password</p>
-              </div>
-            </div>
           </CardFooter>
         </Card>
       </div>
