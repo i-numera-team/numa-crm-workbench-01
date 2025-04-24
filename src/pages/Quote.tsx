@@ -19,6 +19,7 @@ export default function Quote() {
   const { user } = useAuth();
   const [offers, setOffers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [quotes, setQuotes] = useState<any[]>([]);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function Quote() {
             dossier_id: '1',
             status: 'pending_admin',
             total_price: totalTTC,
-            description: 'Devis en attente de confirmation administrative'
+            description: 'Devis en attente de validation administrative'
           }
         ])
         .select()
@@ -173,9 +174,9 @@ export default function Quote() {
               <div className="mb-6">
                 <h3 className="text-sm font-bold text-[#2B3266] mb-1">Informations de paiement</h3>
                 <p className="text-xs">Paiement par virement bancaire</p>
-                <p className="text-xs">Banque : BMCE</p>
-                <p className="text-xs">IBAN : FR76-0000-0000-0105-6378-2010-104</p>
-                <p className="text-xs">BIC : BMOIMABC</p>
+                <p className="text-xs">Banque : {quotes?.[0]?.bank_name || 'En attente'}</p>
+                <p className="text-xs">IBAN : {quotes?.[0]?.iban || 'En attente'}</p>
+                <p className="text-xs">BIC : {quotes?.[0]?.bic || 'En attente'}</p>
               </div>
               
               <div>

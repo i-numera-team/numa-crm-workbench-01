@@ -9,7 +9,6 @@ import {
   Dialog, 
   DialogContent, 
   DialogDescription, 
-  DialogFooter, 
   DialogHeader, 
   DialogTitle 
 } from '@/components/ui/dialog';
@@ -24,6 +23,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { BankDetailsForm, BankDetails } from '@/components/BankDetailsForm';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Cart() {
   const { cartItems, updateQuantity, removeFromCart, clearCart, totalItems, totalPrice } = useCart();
@@ -40,6 +41,7 @@ export default function Cart() {
   ]);
   const [quoteNote, setQuoteNote] = useState('');
   const [processingQuote, setProcessingQuote] = useState(false);
+  const [showBankDetails, setShowBankDetails] = useState(false);
   
   // Toggle agent view for agent/admin users
   const toggleAgentView = () => {
@@ -109,6 +111,39 @@ export default function Cart() {
       // Navigate to quotes page
       navigate('/quotes');
     }, 1000);
+  };
+
+  const handleBankDetailsSubmit = async (bankDetails: BankDetails) => {
+    if (!user) {
+      toast.error('Vous devez être connecté pour continuer');
+      return;
+    }
+
+    try {
+      const { data: quote, error } = await supabase
+        .from('quotes')
+        .insert([
+          {
+            dossier_id: '1',
+            status: 'pending_admin',
+            total_price: totalPrice,
+            description: 'Devis en attente de validation administrative',
+            bank_name: bankDetails.bankName,
+            iban: bankDetails.iban,
+            bic: bankDetails.bic
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Devis créé avec succès');
+      navigate('/quote');
+    } catch (error) {
+      console.error('Error creating quote:', error);
+      toast.error('Erreur lors de la création du devis');
+    }
   };
 
   return (
@@ -209,24 +244,24 @@ export default function Cart() {
           {/* Summary */}
           <div className="mt-6 space-y-4">
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
+              <h3 className="text-lg font-semibold mb-4">Récapitulatif de la commande</h3>
               
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Subtotal</span>
-                  <span>${totalPrice.toFixed(2)}</span>
+                  <span className="text-gray-500">Sous-total</span>
+                  <span>{totalPrice.toFixed(2)}€</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Tax</span>
-                  <span>${(totalPrice * 0.1).toFixed(2)}</span>
+                  <span className="text-gray-500">TVA (20%)</span>
+                  <span>{(totalPrice * 0.2).toFixed(2)}€</span>
                 </div>
               </div>
               
               <div className="border-t my-4"></div>
               
               <div className="flex justify-between font-bold">
-                <span>Total</span>
-                <span>${(totalPrice * 1.1).toFixed(2)}</span>
+                <span>Total TTC</span>
+                <span>{(totalPrice * 1.2).toFixed(2)}€</span>
               </div>
               
               <div className="mt-6 flex flex-col sm:flex-row gap-4">
@@ -235,89 +270,30 @@ export default function Cart() {
                   className="flex-1"
                   onClick={() => navigate('/marketplace')}
                 >
-                  Continue Shopping
+                  Continuer les achats
                 </Button>
                 
                 <Button
                   className="flex-1 bg-numa-500 hover:bg-numa-600"
-                  onClick={handleViewQuote}
+                  onClick={() => setShowBankDetails(true)}
                 >
-                  View Quote
-                </Button>
-                
-                <Button
-                  className="flex-1 bg-numa-500 hover:bg-numa-600"
-                  onClick={() => setShowQuoteDialog(true)}
-                >
-                  Request Quote
+                  Voir le devis
                 </Button>
               </div>
             </Card>
           </div>
-          
-          {/* Quote request dialog */}
-          <Dialog open={showQuoteDialog} onOpenChange={setShowQuoteDialog}>
-            <DialogContent>
+
+          {/* Bank Details Dialog */}
+          <Dialog open={showBankDetails} onOpenChange={setShowBankDetails}>
+            <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Request Quote</DialogTitle>
+                <DialogTitle>Informations bancaires</DialogTitle>
                 <DialogDescription>
-                  {isAgentView 
-                    ? 'Create a quote for the selected client.'
-                    : 'Submit your cart items as a quote request.'}
+                  Veuillez fournir vos informations bancaires pour continuer
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4 py-4">
-                {isAgentView && !selectedClient && (
-                  <p className="text-red-500 text-sm">Please select a client first.</p>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="quote-note">Additional notes (optional)</Label>
-                  <Input
-                    id="quote-note"
-                    placeholder="Any specific requirements or questions"
-                    value={quoteNote}
-                    onChange={(e) => setQuoteNote(e.target.value)}
-                  />
-                </div>
-                
-                <div className="border-t my-2 pt-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Items</span>
-                      <span>{totalItems}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Total Amount</span>
-                      <span>${(totalPrice * 1.1).toFixed(2)} (incl. tax)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowQuoteDialog(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  className="bg-numa-500 hover:bg-numa-600"
-                  onClick={handleCreateQuote}
-                  disabled={isAgentView && !selectedClient || processingQuote}
-                >
-                  {processingQuote ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </span>
-                  ) : (
-                    'Submit Quote Request'
-                  )}
-                </Button>
-              </DialogFooter>
+              <BankDetailsForm onSubmit={handleBankDetailsSubmit} />
             </DialogContent>
           </Dialog>
         </>
@@ -326,17 +302,17 @@ export default function Cart() {
           <div className="rounded-full bg-gray-100 p-6 mb-4">
             <ShoppingCart className="h-12 w-12 text-gray-400" />
           </div>
-          <h3 className="text-xl font-medium">Your cart is empty</h3>
+          <h3 className="text-xl font-medium">Votre panier est vide</h3>
           <p className="text-gray-500 mt-2 mb-6">
             {isAgentView 
-              ? 'Add items to create a quote for your client'
-              : 'Browse the marketplace to add items to your cart'}
+              ? 'Ajoutez des articles pour créer un devis pour votre client'
+              : 'Parcourez la marketplace pour ajouter des articles à votre panier'}
           </p>
           <Button
             onClick={() => navigate('/marketplace')}
             className="bg-numa-500 hover:bg-numa-600"
           >
-            Browse Marketplace
+            Voir la marketplace
           </Button>
         </div>
       )}

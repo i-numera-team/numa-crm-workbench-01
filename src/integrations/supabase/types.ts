@@ -226,27 +226,36 @@ export type Database = {
       }
       quotes: {
         Row: {
+          bank_name: string | null
+          bic: string | null
           created_at: string
           description: string | null
           dossier_id: string
+          iban: string | null
           id: string
           status: string
           total_price: number
           updated_at: string
         }
         Insert: {
+          bank_name?: string | null
+          bic?: string | null
           created_at?: string
           description?: string | null
           dossier_id: string
+          iban?: string | null
           id?: string
           status?: string
           total_price: number
           updated_at?: string
         }
         Update: {
+          bank_name?: string | null
+          bic?: string | null
           created_at?: string
           description?: string | null
           dossier_id?: string
+          iban?: string | null
           id?: string
           status?: string
           total_price?: number
