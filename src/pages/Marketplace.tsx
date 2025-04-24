@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
+import { CartItem } from '@/utils/mockData';
 
 interface Offer {
   id: string;
@@ -69,12 +70,14 @@ export default function Marketplace() {
   };
   
   const handleAddToCart = (offer: Offer) => {
-    addToCart({
-      offerId: offer.id, // Use offer.id instead of non-existent offerId property
+    // Create a CartItem from the Offer
+    const cartItem: CartItem = {
+      offerId: offer.id,
       offerTitle: offer.name,
       price: offer.price_monthly,
       quantity: 1
-    });
+    };
+    addToCart(cartItem);
   };
   
   const handleRemoveFromCart = (offerId: string) => {
