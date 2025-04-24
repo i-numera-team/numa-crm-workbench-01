@@ -1,6 +1,5 @@
 
 import { useState } from 'react';
-import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BankDetailsForm } from '@/components/BankDetailsForm';
@@ -10,6 +9,8 @@ import { CartItemList } from '@/components/cart/CartItemList';
 import { CartSummary } from '@/components/cart/CartSummary';
 import { EmptyCartState } from '@/components/cart/EmptyCartState';
 import { useQuoteActions } from '@/hooks/useQuoteActions';
+import { useCartState } from '@/hooks/useCartState';
+import { useCartActions } from '@/hooks/useCartActions';
 
 export default function Cart() {
   const [isAgentView, setIsAgentView] = useState(false);
@@ -21,8 +22,9 @@ export default function Cart() {
     { id: '5', name: 'Michael Johnson', company: 'Johnson Enterprises' }
   ]);
 
-  const { cartItems, updateQuantity, removeFromCart, clearCart, totalItems, totalPrice } = useCart();
   const { user } = useAuth();
+  const { cartItems, setCartItems, totalItems, totalPrice } = useCartState();
+  const { updateQuantity, removeFromCart, clearCart } = useCartActions(setCartItems);
   const { creatingQuote, handleBankDetailsSubmit } = useQuoteActions(cartItems, totalPrice, clearCart);
 
   const toggleAgentView = () => {
