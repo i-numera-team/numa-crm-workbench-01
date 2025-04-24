@@ -1,81 +1,21 @@
+
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useState } from 'react';
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { supabase } from "@/integrations/supabase/client";
 import { QuoteHeader } from '@/components/quote/QuoteHeader';
 import { ClientInfo } from '@/components/quote/ClientInfo';
 import { QuoteLineItems } from '@/components/quote/QuoteLineItems';
 import { QuoteTotals } from '@/components/quote/QuoteTotals';
 import { QuoteFooter } from '@/components/quote/QuoteFooter';
-
-interface LineItemType {
-  offre: string;
-  description: string;
-  prix: number;
-  quantite: number;
-  montant: number;
-}
+import { useQuoteData } from '@/hooks/useQuoteData';
 
 export default function Quote() {
   const { cartItems, totalPrice } = useCart();
   const { user } = useAuth();
-  const [offers, setOffers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [bankDetails, setBankDetails] = useState({
-    bankName: '',
-    iban: '',
-    bic: ''
-  });
   const navigate = useNavigate();
-  
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setIsLoading(true);
-        
-        const { data: offersData, error: offersError } = await supabase
-          .from('offers')
-          .select('*')
-          .eq('is_active', true);
-          
-        if (offersError) {
-          console.error('Error fetching offers:', offersError);
-          toast.error('Erreur lors du chargement des offres');
-          return;
-        }
-        
-        setOffers(offersData || []);
-        
-        const { data: quotesData, error: quotesError } = await supabase
-          .from('quotes')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1);
-        
-        if (quotesError) {
-          console.error('Error fetching quotes:', quotesError);
-        } else if (quotesData && quotesData.length > 0) {
-          setQuotes(quotesData);
-          setBankDetails({
-            bankName: quotesData[0]?.bank_name || '',
-            iban: quotesData[0]?.iban || '',
-            bic: quotesData[0]?.bic || ''
-          });
-        }
-      } catch (err) {
-        console.error('Exception:', err);
-        toast.error('Une erreur est survenue');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    
-    fetchData();
-  }, []);
+  const { offers, quotes, bankDetails, isLoading } = useQuoteData();
   
   const lineItems = cartItems.map(item => ({
     offre: item.offerTitle,
@@ -84,11 +24,6 @@ export default function Quote() {
     quantite: item.quantity,
     montant: item.price * item.quantity
   }));
-  
-  const tva = totalPrice * 0.2;
-  const totalTTC = totalPrice + tva;
-  
-  const currentDate = new Date().toLocaleDateString('fr-FR');
 
   const handleAcceptQuote = async () => {
     if (!user) {
@@ -117,6 +52,10 @@ export default function Quote() {
     }
   };
   
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Chargement...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl bg-white shadow-lg print:shadow-none [&_*]:text-gray-900 dark:[&_*]:text-gray-900">
