@@ -4,11 +4,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-
-interface BankDetailsFormProps {
-  onSubmit: (bankDetails: BankDetails) => void;
-  isLoading?: boolean;
-}
+import { profileService } from '@/services';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface BankDetails {
   bankName: string;
@@ -16,14 +13,18 @@ export interface BankDetails {
   bic: string;
 }
 
-export function BankDetailsForm({ onSubmit, isLoading = false }: BankDetailsFormProps) {
+export function BankDetailsForm({ onSubmit, isLoading = false }: { 
+  onSubmit: (bankDetails: BankDetails) => void, 
+  isLoading?: boolean 
+}) {
+  const { user } = useAuth();
   const [bankDetails, setBankDetails] = useState<BankDetails>({
     bankName: '',
     iban: '',
     bic: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!bankDetails.bankName || !bankDetails.iban || !bankDetails.bic) {
@@ -32,17 +33,40 @@ export function BankDetailsForm({ onSubmit, isLoading = false }: BankDetailsForm
     }
 
     // Validation basique pour IBAN et BIC
-    if (bankDetails.iban.length < 15) {
-      toast.error('L\'IBAN semble être invalide (trop court)');
+    if (bankDetails.iban.length < 15 || bankDetails.iban.length > 34) {
+      toast.error('L\'IBAN semble être invalide');
       return;
     }
 
-    if (bankDetails.bic.length < 8) {
-      toast.error('Le BIC semble être invalide (trop court)');
+    if (bankDetails.bic.length < 8 || bankDetails.bic.length > 11) {
+      toast.error('Le BIC semble être invalide');
       return;
     }
 
-    onSubmit(bankDetails);
+    if (!user) {
+      toast.error('Vous devez être connecté');
+      return;
+    }
+
+    try {
+      // First, update the user's profile with bank details
+      const updateResult = await profileService.updateProfile(user.id, {
+        bankName: bankDetails.bankName,
+        iban: bankDetails.iban,
+        bic: bankDetails.bic
+      });
+
+      if (!updateResult.success) {
+        toast.error(updateResult.message);
+        return;
+      }
+
+      // If profile update is successful, call onSubmit to proceed with quote creation
+      onSubmit(bankDetails);
+    } catch (error) {
+      toast.error('Erreur lors de la mise à jour des informations bancaires');
+      console.error(error);
+    }
   };
 
   return (

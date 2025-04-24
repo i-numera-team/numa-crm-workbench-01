@@ -5,20 +5,23 @@ import { authService } from "./authService";
 import { toast } from 'sonner';
 
 export class ProfileService {
-  async updateProfile(userId: string, profileData: Partial<User>): Promise<{ success: boolean; message: string }> {
+  async updateProfile(userId: string, profileData: Partial<User> & { bankName?: string; iban?: string; bic?: string }): Promise<{ success: boolean; message: string }> {
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
           company: profileData.company,
           phone: profileData.phone,
-          role: profileData.role
+          role: profileData.role,
+          bank_name: profileData.bankName,
+          iban: profileData.iban,
+          bic: profileData.bic
         })
         .eq('id', userId);
         
       if (error) {
         console.error('Update profile error:', error);
-        return { success: false, message: 'Erreur lors de la mise à jour du profil' };
+        return { success: false, message: 'Erreur lors de la mise à jour du profil bancaire' };
       }
       
       // Update local storage
@@ -31,7 +34,7 @@ export class ProfileService {
         authService.setCurrentUser(updatedUser);
       }
       
-      return { success: true, message: 'Profil mis à jour avec succès' };
+      return { success: true, message: 'Profil bancaire mis à jour avec succès' };
     } catch (err) {
       console.error('Update profile exception:', err);
       return { success: false, message: 'Une erreur est survenue' };

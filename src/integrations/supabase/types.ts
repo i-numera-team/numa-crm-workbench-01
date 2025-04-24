@@ -142,12 +142,15 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bank_name: string | null
+          bic: string | null
           birthdate: string | null
           company: string | null
           created_at: string
           email: string
           email_confirmation_token: string | null
           email_confirmed: boolean | null
+          iban: string | null
           id: string
           last_signin: string | null
           phone: string | null
@@ -155,12 +158,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bank_name?: string | null
+          bic?: string | null
           birthdate?: string | null
           company?: string | null
           created_at?: string
           email: string
           email_confirmation_token?: string | null
           email_confirmed?: boolean | null
+          iban?: string | null
           id: string
           last_signin?: string | null
           phone?: string | null
@@ -168,12 +174,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bank_name?: string | null
+          bic?: string | null
           birthdate?: string | null
           company?: string | null
           created_at?: string
           email?: string
           email_confirmation_token?: string | null
           email_confirmed?: boolean | null
+          iban?: string | null
           id?: string
           last_signin?: string | null
           phone?: string | null
