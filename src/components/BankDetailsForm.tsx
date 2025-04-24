@@ -4,7 +4,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { profileService } from '@/services';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface BankDetails {
@@ -49,8 +48,7 @@ export function BankDetailsForm({ onSubmit, isLoading = false }: {
     }
 
     try {
-      // Skip profile update and proceed directly with quote creation
-      // This avoids the UUID error when trying to update the profile
+      // Proceed directly with quote creation using the bank details
       onSubmit(bankDetails);
     } catch (error) {
       toast.error('Erreur lors de la mise à jour des informations bancaires');

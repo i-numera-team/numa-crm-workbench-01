@@ -78,12 +78,16 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       // First, create a new dossier or get an existing one
       let dossierId;
       
+      // Make sure the user.id is a valid UUID - this is critical
+      const userId = user.id;
+      
+      console.log('User ID used for dossier query:', userId);
+      
       // Try to fetch an existing dossier for the current user
-      // Use the actual UUID from the user object
       const { data: existingDossiers, error: fetchError } = await supabase
         .from('dossiers')
         .select('id')
-        .eq('client_id', user.id)
+        .eq('client_id', userId)
         .limit(1);
       
       if (fetchError) {
@@ -94,12 +98,14 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       // Use existing dossier if available, otherwise create a new one
       if (existingDossiers && existingDossiers.length > 0) {
         dossierId = existingDossiers[0].id;
+        console.log('Using existing dossier:', dossierId);
       } else {
+        console.log('Creating new dossier for user:', userId);
         // Create a new dossier
         const { data: newDossier, error: dossierError } = await supabase
           .from('dossiers')
           .insert([{
-            client_id: user.id,
+            client_id: userId,
             status: 'draft'
           }])
           .select()
@@ -110,8 +116,15 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
           throw new Error(`Erreur lors de la création du dossier: ${dossierError.message}`);
         }
         
+        if (!newDossier) {
+          throw new Error('Aucun dossier n\'a été créé');
+        }
+        
         dossierId = newDossier.id;
+        console.log('Created new dossier with ID:', dossierId);
       }
+      
+      console.log('Creating quote with dossier_id:', dossierId);
       
       // Now create the quote with the valid dossier_id
       const { data: quote, error } = await supabase
@@ -157,6 +170,7 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       }
 
       toast.success('Devis créé avec succès');
+      clearCart(); // Clear the cart after successful quote creation
       navigate('/quote');
     } catch (error) {
       console.error('Error creating quote:', error);
