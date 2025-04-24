@@ -75,11 +75,43 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
     try {
       setCreatingQuote(true);
       
+      // First, create a new dossier or get an existing one
+      let dossierId;
+      
+      // Try to fetch an existing dossier for the current user
+      const { data: existingDossiers } = await supabase
+        .from('dossiers')
+        .select('id')
+        .eq('client_id', user.id)
+        .limit(1);
+      
+      // Use existing dossier if available, otherwise create a new one
+      if (existingDossiers && existingDossiers.length > 0) {
+        dossierId = existingDossiers[0].id;
+      } else {
+        // Create a new dossier
+        const { data: newDossier, error: dossierError } = await supabase
+          .from('dossiers')
+          .insert([{
+            client_id: user.id,
+            status: 'draft'
+          }])
+          .select()
+          .single();
+          
+        if (dossierError) {
+          throw new Error(`Erreur lors de la création du dossier: ${dossierError.message}`);
+        }
+        
+        dossierId = newDossier.id;
+      }
+      
+      // Now create the quote with a valid dossier_id
       const { data: quote, error } = await supabase
         .from('quotes')
         .insert([
           {
-            dossier_id: '1',
+            dossier_id: dossierId,
             status: 'pending_admin',
             total_price: totalPrice * 1.2,
             description: 'Devis en attente de validation administrative',
