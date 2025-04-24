@@ -86,8 +86,8 @@ class AuthService {
         email: data.user.email || '',
         role: userProfile.role as UserRole,
         isEmailVerified: data.user.email_confirmed_at !== null,
-        company: userProfile.company,
-        phone: userProfile.phone
+        company: userProfile.company || undefined,
+        phone: userProfile.phone || undefined
       };
       
       this.setCurrentUser(userData);

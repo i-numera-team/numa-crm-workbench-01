@@ -1,7 +1,7 @@
 
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { authService, User, UserRole } from '../utils/auth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface AuthContextType {
@@ -18,10 +18,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Create a wrapper component that doesn't use hooks that require Router context
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Check if user is already logged in
@@ -33,20 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const result = authService.login(email, password);
+      const result = await authService.login(email, password);
       if (result.success) {
         const currentUser = authService.getCurrentUser();
         setUser(currentUser);
         toast.success('Logged in successfully!');
-        
-        // Redirect based on user role
-        if (currentUser?.role === 'admin') {
-          navigate('/dashboard');
-        } else if (currentUser?.role === 'agent') {
-          navigate('/dashboard');
-        } else {
-          navigate('/dashboard');
-        }
       } else {
         toast.error(result.message);
       }
@@ -61,10 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (name: string, email: string, password: string, company?: string) => {
     setIsLoading(true);
     try {
-      const result = authService.register(name, email, password, company);
+      const result = await authService.register(name, email, password, company);
       if (result.success) {
         toast.success(result.message);
-        navigate('/verify-email', { state: { email } });
       } else {
         toast.error(result.message);
       }
@@ -79,10 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const verifyEmail = async (email: string) => {
     setIsLoading(true);
     try {
-      const result = authService.verifyEmail(email);
+      const result = await authService.verifyEmail(email);
       if (result.success) {
         toast.success(result.message);
-        navigate('/login');
       } else {
         toast.error(result.message);
       }
@@ -98,7 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authService.logout();
     setUser(null);
     toast.success('Logged out successfully');
-    navigate('/login');
   };
 
   const isAuthenticated = !!user;
@@ -124,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// Create a consumer hook that can be used inside Router context
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
