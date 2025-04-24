@@ -2,29 +2,17 @@ import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockDataService } from '@/utils/mockData';
-import { Card } from '@/components/ui/card';
+import { ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle 
-} from '@/components/ui/dialog';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BankDetailsForm, BankDetails } from '@/components/BankDetailsForm';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { CartHeader } from '@/components/cart/CartHeader';
+import { AgentClientSelector } from '@/components/cart/AgentClientSelector';
+import { CartItemList } from '@/components/cart/CartItemList';
+import { CartSummary } from '@/components/cart/CartSummary';
 
 export default function Cart() {
   const [isAgentView, setIsAgentView] = useState(false);
@@ -168,137 +156,34 @@ export default function Cart() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Panier d'achat</h1>
-          <p className="text-muted-foreground">
-            {totalItems} article{totalItems !== 1 ? 's' : ''} dans votre panier
-          </p>
-        </div>
-        
-        {(user?.role === 'agent' || user?.role === 'admin') && (
-          <Button 
-            variant="outline"
-            onClick={() => setIsAgentView(!isAgentView)}
-            className="mt-4 sm:mt-0"
-          >
-            {isAgentView ? 'Vue personnelle' : 'Vue agent'}
-          </Button>
-        )}
-      </div>
+      <CartHeader 
+        totalItems={totalItems}
+        isAgentView={isAgentView}
+        onToggleView={toggleAgentView}
+        userRole={user?.role}
+      />
       
       {isAgentView && (
-        <Card className="p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex-1">
-              <Label htmlFor="client-select" className="mb-2 block">Select Client</Label>
-              <Select
-                value={selectedClient}
-                onValueChange={setSelectedClient}
-              >
-                <SelectTrigger id="client-select">
-                  <SelectValue placeholder="Select a client" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientList.map(client => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name} ({client.company})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </Card>
+        <AgentClientSelector
+          selectedClient={selectedClient}
+          onClientSelect={setSelectedClient}
+          clientList={clientList}
+        />
       )}
 
       {cartItems.length > 0 ? (
         <>
-          <div className="space-y-4">
-            {cartItems.map((item) => (
-              <Card key={item.offerId} className="p-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-medium">{item.offerTitle}</h3>
-                    <p className="text-gray-500">{item.price}€ par unité</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => updateQuantity(item.offerId, Math.max(1, item.quantity - 1))}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    
-                    <span className="w-10 text-center">{item.quantity}</span>
-                    
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => updateQuantity(item.offerId, item.quantity + 1)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <div className="text-right sm:w-24">
-                    <p className="font-medium">{(item.price * item.quantity).toFixed(2)}€</p>
-                  </div>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeFromCart(item.offerId)}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
+          <CartItemList
+            items={cartItems}
+            onUpdateQuantity={updateQuantity}
+            onRemoveItem={removeFromCart}
+          />
           
           <div className="mt-6 space-y-4">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Récapitulatif de la commande</h3>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Sous-total</span>
-                  <span>{totalPrice.toFixed(2)}€</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">TVA (20%)</span>
-                  <span>{(totalPrice * 0.2).toFixed(2)}€</span>
-                </div>
-              </div>
-              
-              <div className="border-t my-4"></div>
-              
-              <div className="flex justify-between font-bold">
-                <span>Total TTC</span>
-                <span>{(totalPrice * 1.2).toFixed(2)}€</span>
-              </div>
-              
-              <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => navigate('/marketplace')}
-                >
-                  Continuer les achats
-                </Button>
-                
-                <Button
-                  className="flex-1 bg-numa-500 hover:bg-numa-600"
-                  onClick={() => setShowBankDetails(true)}
-                >
-                  Voir le devis
-                </Button>
-              </div>
-            </Card>
+            <CartSummary
+              totalPrice={totalPrice}
+              onShowBankDetails={() => setShowBankDetails(true)}
+            />
           </div>
 
           <Dialog open={showBankDetails} onOpenChange={setShowBankDetails}>
