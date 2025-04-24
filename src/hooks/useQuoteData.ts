@@ -1,73 +1,72 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
-import { useState, useEffect } from 'react';
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from 'sonner';
-
-interface QuoteData {
-  offers: any[];
-  quotes: any[];
-  bankDetails: {
-    bankName: string;
-    iban: string;
-    bic: string;
-  };
-  isLoading: boolean;
-}
-
-export function useQuoteData(): QuoteData {
-  const [offers, setOffers] = useState<any[]>([]);
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [bankDetails, setBankDetails] = useState({
-    bankName: '',
-    iban: '',
-    bic: ''
-  });
+export function useQuoteData() {
+  const [offers, setOffers] = useState([]);
+  const [quotes, setQuotes] = useState([]);
+  const [bankDetails, setBankDetails] = useState({ bankName: '', iban: '', bic: '' });
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    async function fetchData() {
+    const fetchData = async () => {
+      if (!user?.id) return;
+
       try {
-        setIsLoading(true);
-        
+        // Fetch profile bank details
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('bank_name, iban, bic')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+        } else if (profileData) {
+          setBankDetails({
+            bankName: profileData.bank_name || '',
+            iban: profileData.iban || '',
+            bic: profileData.bic || ''
+          });
+        }
+
+        // Fetch offers
         const { data: offersData, error: offersError } = await supabase
           .from('offers')
-          .select('*')
-          .eq('is_active', true);
-          
+          .select('*');
+
         if (offersError) {
           console.error('Error fetching offers:', offersError);
-          toast.error('Erreur lors du chargement des offres');
-          return;
+        } else {
+          setOffers(offersData || []);
         }
-        
-        setOffers(offersData || []);
-        
+
+        // Fetch quotes
         const { data: quotesData, error: quotesError } = await supabase
           .from('quotes')
           .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1);
-        
+          .eq('dossier_id', user.id);
+
         if (quotesError) {
           console.error('Error fetching quotes:', quotesError);
-        } else if (quotesData && quotesData.length > 0) {
-          setQuotes(quotesData);
-          setBankDetails({
-            bankName: quotesData[0]?.bank_name || '',
-            iban: quotesData[0]?.iban || '',
-            bic: quotesData[0]?.bic || ''
-          });
+        } else {
+          setQuotes(quotesData || []);
         }
-      } catch (err) {
-        console.error('Exception:', err);
-        toast.error('Une erreur est survenue');
+      } catch (error) {
+        console.error('Error fetching data:', error);
       } finally {
         setIsLoading(false);
       }
-    }
-    
-    fetchData();
-  }, []);
+    };
 
-  return { offers, quotes, bankDetails, isLoading };
+    fetchData();
+  }, [user]);
+
+  return {
+    offers,
+    quotes,
+    bankDetails,
+    isLoading
+  };
 }

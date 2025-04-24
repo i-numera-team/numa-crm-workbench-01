@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,6 +5,7 @@ import { mockDataService } from '@/utils/mockData';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { BankDetails } from '@/components/BankDetailsForm';
+import { profileService } from '@/services';
 
 export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart: () => void) {
   const [processingQuote, setProcessingQuote] = useState(false);
@@ -75,37 +75,42 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
     try {
       setCreatingQuote(true);
       
-      // First, create a new dossier or get an existing one
-      let dossierId;
+      // First, update the user's profile with bank details
+      const profileUpdateResult = await profileService.updateProfile(user.id, {
+        bankName: bankDetails.bankName,
+        iban: bankDetails.iban,
+        bic: bankDetails.bic
+      });
+
+      if (!profileUpdateResult.success) {
+        throw new Error('Erreur lors de la mise à jour du profil');
+      }
       
-      // Make sure the user.id is a valid UUID - this is critical
-      const userId = user.id;
-      
-      console.log('User ID used for dossier query:', userId);
+      console.log('Profile updated with bank details');
       
       // Try to fetch an existing dossier for the current user
       const { data: existingDossiers, error: fetchError } = await supabase
         .from('dossiers')
         .select('id')
-        .eq('client_id', userId)
+        .eq('client_id', user.id)
         .limit(1);
       
       if (fetchError) {
         console.error('Error fetching dossiers:', fetchError);
         throw new Error(`Erreur lors de la récupération du dossier: ${fetchError.message}`);
       }
+
+      let dossierId;
       
-      // Use existing dossier if available, otherwise create a new one
       if (existingDossiers && existingDossiers.length > 0) {
         dossierId = existingDossiers[0].id;
         console.log('Using existing dossier:', dossierId);
       } else {
-        console.log('Creating new dossier for user:', userId);
-        // Create a new dossier
+        console.log('Creating new dossier');
         const { data: newDossier, error: dossierError } = await supabase
           .from('dossiers')
           .insert([{
-            client_id: userId,
+            client_id: user.id,
             status: 'draft'
           }])
           .select()
@@ -115,7 +120,7 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
           console.error('Error creating dossier:', dossierError);
           throw new Error(`Erreur lors de la création du dossier: ${dossierError.message}`);
         }
-        
+
         if (!newDossier) {
           throw new Error('Aucun dossier n\'a été créé');
         }
@@ -124,22 +129,18 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
         console.log('Created new dossier with ID:', dossierId);
       }
       
-      console.log('Creating quote with dossier_id:', dossierId);
-      
-      // Now create the quote with the valid dossier_id
+      // Create the quote with bank details
       const { data: quote, error } = await supabase
         .from('quotes')
-        .insert([
-          {
-            dossier_id: dossierId,
-            status: 'pending_admin',
-            total_price: totalPrice * 1.2,
-            description: 'Devis en attente de validation administrative',
-            bank_name: bankDetails.bankName,
-            iban: bankDetails.iban,
-            bic: bankDetails.bic
-          }
-        ])
+        .insert([{
+          dossier_id: dossierId,
+          status: 'pending_admin',
+          total_price: totalPrice * 1.2,
+          description: 'Devis en attente de validation administrative',
+          bank_name: bankDetails.bankName,
+          iban: bankDetails.iban,
+          bic: bankDetails.bic
+        }])
         .select()
         .single();
 
@@ -170,7 +171,7 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       }
 
       toast.success('Devis créé avec succès');
-      clearCart(); // Clear the cart after successful quote creation
+      clearCart();
       navigate('/quote');
     } catch (error) {
       console.error('Error creating quote:', error);
