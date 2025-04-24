@@ -16,7 +16,7 @@ export interface BankDetails {
   bic: string;
 }
 
-export function BankDetailsForm({ onSubmit, isLoading }: BankDetailsFormProps) {
+export function BankDetailsForm({ onSubmit, isLoading = false }: BankDetailsFormProps) {
   const [bankDetails, setBankDetails] = useState<BankDetails>({
     bankName: '',
     iban: '',
@@ -28,6 +28,17 @@ export function BankDetailsForm({ onSubmit, isLoading }: BankDetailsFormProps) {
     
     if (!bankDetails.bankName || !bankDetails.iban || !bankDetails.bic) {
       toast.error('Veuillez remplir tous les champs');
+      return;
+    }
+
+    // Validation basique pour IBAN et BIC
+    if (bankDetails.iban.length < 15) {
+      toast.error('L\'IBAN semble être invalide (trop court)');
+      return;
+    }
+
+    if (bankDetails.bic.length < 8) {
+      toast.error('Le BIC semble être invalide (trop court)');
       return;
     }
 

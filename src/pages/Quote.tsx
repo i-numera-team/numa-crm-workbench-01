@@ -1,3 +1,4 @@
+
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
@@ -20,24 +21,50 @@ export default function Quote() {
   const [offers, setOffers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [quotes, setQuotes] = useState<any[]>([]);
+  const [bankDetails, setBankDetails] = useState({
+    bankName: '',
+    iban: '',
+    bic: ''
+  });
   const navigate = useNavigate();
   
   useEffect(() => {
-    async function fetchOffers() {
+    async function fetchData() {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
+        
+        // Charger les offres
+        const { data: offersData, error: offersError } = await supabase
           .from('offers')
           .select('*')
           .eq('is_active', true);
           
-        if (error) {
-          console.error('Error fetching offers:', error);
+        if (offersError) {
+          console.error('Error fetching offers:', offersError);
           toast.error('Erreur lors du chargement des offres');
           return;
         }
         
-        setOffers(data || []);
+        setOffers(offersData || []);
+        
+        // Charger le dernier devis de l'utilisateur
+        const { data: quotesData, error: quotesError } = await supabase
+          .from('quotes')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (quotesError) {
+          console.error('Error fetching quotes:', quotesError);
+        } else if (quotesData && quotesData.length > 0) {
+          setQuotes(quotesData);
+          // Charger les détails bancaires depuis le devis
+          setBankDetails({
+            bankName: quotesData[0]?.bank_name || '',
+            iban: quotesData[0]?.iban || '',
+            bic: quotesData[0]?.bic || ''
+          });
+        }
       } catch (err) {
         console.error('Exception:', err);
         toast.error('Une erreur est survenue');
@@ -46,7 +73,7 @@ export default function Quote() {
       }
     }
     
-    fetchOffers();
+    fetchData();
   }, []);
   
   const lineItems = cartItems.map(item => ({
@@ -69,18 +96,17 @@ export default function Quote() {
     }
 
     try {
-      const { data: quote, error } = await supabase
+      // Vérifier si le devis existe déjà
+      if (quotes.length === 0) {
+        toast.error('Aucun devis disponible à accepter');
+        return;
+      }
+      
+      // Mettre à jour le statut du devis
+      const { error } = await supabase
         .from('quotes')
-        .insert([
-          {
-            dossier_id: '1',
-            status: 'pending_admin',
-            total_price: totalTTC,
-            description: 'Devis en attente de validation administrative'
-          }
-        ])
-        .select()
-        .single();
+        .update({ status: 'pending_admin' })
+        .eq('id', quotes[0].id);
 
       if (error) throw error;
 
@@ -96,6 +122,7 @@ export default function Quote() {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl bg-white shadow-lg print:shadow-none [&_*]:text-gray-900 dark:[&_*]:text-gray-900">
         <div className="p-8 print:p-0">
+          {/* En-tête du devis */}
           <div className="relative mb-6 h-[300px] bg-no-repeat bg-cover bg-top" 
                style={{ backgroundImage: "url('/images/inum.png')" }}>
             <div className="left-[100px] top-[100px] bg text-white p-4 rounded-t-md relative items-center">
@@ -116,6 +143,7 @@ export default function Quote() {
             </div>
           </div>
 
+          {/* Informations du client */}
           <div className="mb-6">
             <div className="flex flex-col">
               <h2 className="font-bold text-base">Client: {user?.name}</h2>
@@ -125,6 +153,7 @@ export default function Quote() {
             </div>
           </div>
 
+          {/* Tableau des articles */}
           <div className="mb-6 space-y-4">
             <div className="flex items-center mb-4 rounded-xl border-[2px] border-red-400">
               <div className="w-1/6 py-7 px-4 text-left text-xs font-bold">Offre</div>
@@ -144,12 +173,14 @@ export default function Quote() {
               </div>
             ))}
 
+            {/* Total HT */}
             <div className="flex items-center border border-gray-400 rounded-md">
               <div className="w-5/6 py-2 px-4 text-right text-xs font-bold border-r border-gray-400">Total HT</div>
               <div className="w-1/6 py-2 px-4 text-right text-xs font-bold">{totalPrice}€ HT</div>
             </div>
           </div>
 
+          {/* Récapitulatif des totaux */}
           <div className="mb-6">
             <div className="flex flex-col items-end">
               <div className="w-1/3">
@@ -169,14 +200,15 @@ export default function Quote() {
             </div>
           </div>
 
+          {/* Informations de paiement et signature */}
           <div className="flex justify-between">
             <div className="w-1/2">
               <div className="mb-6">
                 <h3 className="text-sm font-bold text-[#2B3266] mb-1">Informations de paiement</h3>
                 <p className="text-xs">Paiement par virement bancaire</p>
-                <p className="text-xs">Banque : {quotes?.[0]?.bank_name || 'En attente'}</p>
-                <p className="text-xs">IBAN : {quotes?.[0]?.iban || 'En attente'}</p>
-                <p className="text-xs">BIC : {quotes?.[0]?.bic || 'En attente'}</p>
+                <p className="text-xs">Banque : {bankDetails.bankName || 'En attente'}</p>
+                <p className="text-xs">IBAN : {bankDetails.iban || 'En attente'}</p>
+                <p className="text-xs">BIC : {bankDetails.bic || 'En attente'}</p>
               </div>
               
               <div>
@@ -195,6 +227,7 @@ export default function Quote() {
             </div>
           </div>
 
+          {/* Boutons d'action */}
           <div className="mt-6 flex justify-end space-x-4">
             <Button 
               variant="outline" 

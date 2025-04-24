@@ -27,10 +27,6 @@ import { BankDetailsForm, BankDetails } from '@/components/BankDetailsForm';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Cart() {
-  const { cartItems, updateQuantity, removeFromCart, clearCart, totalItems, totalPrice } = useCart();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  
   const [isAgentView, setIsAgentView] = useState(false);
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [selectedClient, setSelectedClient] = useState('');
@@ -42,11 +38,14 @@ export default function Cart() {
   const [quoteNote, setQuoteNote] = useState('');
   const [processingQuote, setProcessingQuote] = useState(false);
   const [showBankDetails, setShowBankDetails] = useState(false);
-  
-  // Toggle agent view for agent/admin users
+  const [creatingQuote, setCreatingQuote] = useState(false);
+
+  const { cartItems, updateQuantity, removeFromCart, clearCart, totalItems, totalPrice } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
   const toggleAgentView = () => {
     if (isAgentView) {
-      // Reset agent-specific state when switching back to personal view
       setSelectedClient('');
     }
     setIsAgentView(!isAgentView);
@@ -60,14 +59,12 @@ export default function Cart() {
     setProcessingQuote(true);
     
     setTimeout(() => {
-      // For agent view, validate client selection
       if (isAgentView && !selectedClient) {
         toast.error('Please select a client');
         setProcessingQuote(false);
         return;
       }
       
-      // Get client info (either logged-in user or selected client)
       const clientId = isAgentView ? selectedClient : user?.id;
       const clientInfo = isAgentView 
         ? clientList.find(c => c.id === selectedClient)
@@ -79,7 +76,6 @@ export default function Cart() {
         return;
       }
       
-      // Simulation of creating a quote
       const quoteItems = cartItems.map(item => ({
         offerId: item.offerId,
         offerTitle: item.offerTitle,
@@ -87,10 +83,8 @@ export default function Cart() {
         quantity: item.quantity
       }));
       
-      // Create a dummy dossier if there's none for this client
-      let dossierId = '1'; // Assuming the first dossier for demo
+      let dossierId = '1';
       
-      // Create the quote
       mockDataService.createQuote({
         dossierId,
         clientId,
@@ -102,13 +96,11 @@ export default function Cart() {
         items: quoteItems
       });
       
-      // Clear cart and show success message
       clearCart();
       toast.success('Quote created successfully!');
       setShowQuoteDialog(false);
       setProcessingQuote(false);
       
-      // Navigate to quotes page
       navigate('/quotes');
     }, 1000);
   };
@@ -120,13 +112,15 @@ export default function Cart() {
     }
 
     try {
+      setCreatingQuote(true);
+      
       const { data: quote, error } = await supabase
         .from('quotes')
         .insert([
           {
             dossier_id: '1',
             status: 'pending_admin',
-            total_price: totalPrice,
+            total_price: totalPrice * 1.2,
             description: 'Devis en attente de validation administrative',
             bank_name: bankDetails.bankName,
             iban: bankDetails.iban,
@@ -136,13 +130,39 @@ export default function Cart() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erreur Supabase:', error);
+        throw new Error(`Erreur lors de la création du devis: ${error.message}`);
+      }
+
+      if (!quote) {
+        throw new Error('Aucun devis n\'a été créé');
+      }
+
+      const quoteItems = cartItems.map(item => ({
+        quote_id: quote.id,
+        offer_id: item.offerId,
+        price: item.price,
+        quantity: item.quantity
+      }));
+
+      if (quoteItems.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('quote_items')
+          .insert(quoteItems);
+
+        if (itemsError) {
+          console.error('Erreur lors de l\'ajout des éléments au devis:', itemsError);
+        }
+      }
 
       toast.success('Devis créé avec succès');
       navigate('/quote');
     } catch (error) {
       console.error('Error creating quote:', error);
-      toast.error('Erreur lors de la création du devis');
+      toast.error(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setCreatingQuote(false);
     }
   };
 
@@ -150,20 +170,19 @@ export default function Cart() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Shopping Cart</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Panier d'achat</h1>
           <p className="text-muted-foreground">
-            {totalItems} item{totalItems !== 1 ? 's' : ''} in your cart
+            {totalItems} article{totalItems !== 1 ? 's' : ''} dans votre panier
           </p>
         </div>
         
-        {/* Agent/Admin toggle view */}
         {(user?.role === 'agent' || user?.role === 'admin') && (
           <Button 
             variant="outline"
-            onClick={toggleAgentView}
+            onClick={() => setIsAgentView(!isAgentView)}
             className="mt-4 sm:mt-0"
           >
-            {isAgentView ? 'Switch to Personal View' : 'Switch to Agent View'}
+            {isAgentView ? 'Vue personnelle' : 'Vue agent'}
           </Button>
         )}
       </div>
@@ -201,7 +220,7 @@ export default function Cart() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="flex-1">
                     <h3 className="font-medium">{item.offerTitle}</h3>
-                    <p className="text-gray-500">${item.price} per unit</p>
+                    <p className="text-gray-500">{item.price}€ par unité</p>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -225,7 +244,7 @@ export default function Cart() {
                   </div>
                   
                   <div className="text-right sm:w-24">
-                    <p className="font-medium">${(item.price * item.quantity).toFixed(2)}</p>
+                    <p className="font-medium">{(item.price * item.quantity).toFixed(2)}€</p>
                   </div>
                   
                   <Button
@@ -241,7 +260,6 @@ export default function Cart() {
             ))}
           </div>
           
-          {/* Summary */}
           <div className="mt-6 space-y-4">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Récapitulatif de la commande</h3>
@@ -283,7 +301,6 @@ export default function Cart() {
             </Card>
           </div>
 
-          {/* Bank Details Dialog */}
           <Dialog open={showBankDetails} onOpenChange={setShowBankDetails}>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
@@ -293,7 +310,10 @@ export default function Cart() {
                 </DialogDescription>
               </DialogHeader>
               
-              <BankDetailsForm onSubmit={handleBankDetailsSubmit} />
+              <BankDetailsForm 
+                onSubmit={handleBankDetailsSubmit} 
+                isLoading={creatingQuote}
+              />
             </DialogContent>
           </Dialog>
         </>
