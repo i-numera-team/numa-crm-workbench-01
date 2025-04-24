@@ -1,4 +1,7 @@
 
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from 'sonner';
+
 export type UserRole = 'client' | 'agent' | 'admin';
 
 export interface User {
@@ -8,55 +11,14 @@ export interface User {
   role: UserRole;
   isEmailVerified: boolean;
   company?: string;
-  phone?: string; // Added phone property
+  phone?: string;
 }
 
-// Initial users with phone numbers
-const initialUsers: User[] = [
-  {
-    id: '1',
-    name: 'Admin User',
-    email: 'admin@inuma.com',
-    role: 'admin',
-    isEmailVerified: true,
-    phone: '+33 9 86 40 63'
-  },
-  {
-    id: '2',
-    name: 'Agent User',
-    email: 'agent@inuma.com',
-    role: 'agent',
-    isEmailVerified: true,
-    phone: '+33 9 86 40 64'
-  },
-  {
-    id: '3',
-    name: 'Client User',
-    email: 'client@inuma.com',
-    role: 'client',
-    isEmailVerified: true,
-    company: 'ABC Corporation',
-    phone: '+33 9 86 40 65'
-  }
-];
-
-// Mock authentication service
+// Auth service using Supabase
 class AuthService {
   private readonly STORAGE_KEY = 'i-numa-auth';
-  private readonly USERS_KEY = 'i-numa-users';
 
-  // Get initial users or create if not exist
-  private getInitialUsers(): User[] {
-    const storedUsers = localStorage.getItem(this.USERS_KEY);
-    if (storedUsers) {
-      return JSON.parse(storedUsers);
-    }
-    
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(initialUsers));
-    return initialUsers;
-  }
-  
-  // Get current user
+  // Get current user from storage
   getCurrentUser(): User | null {
     const userJson = localStorage.getItem(this.STORAGE_KEY);
     return userJson ? JSON.parse(userJson) : null;
@@ -71,66 +33,146 @@ class AuthService {
     }
   }
   
-  // Login user
-  login(email: string, password: string): { success: boolean; message: string } {
-    // In a real app, we would validate the password
-    const users = this.getInitialUsers();
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (!user) {
-      return { success: false, message: 'User not found' };
+  // Login user with Supabase
+  async login(email: string, password: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) {
+        console.error('Login error:', error);
+        return { success: false, message: error.message };
+      }
+      
+      if (!data.user) {
+        return { success: false, message: 'Utilisateur non trouvé' };
+      }
+      
+      // Get user profile from the profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+      
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        // If there's no profile, create one with default values
+        if (profileError.code === 'PGRST116') {
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              role: 'client'
+            });
+            
+          if (insertError) {
+            console.error('Error creating profile:', insertError);
+            return { success: false, message: 'Erreur lors de la création du profil' };
+          }
+        } else {
+          return { success: false, message: 'Erreur lors de la récupération du profil' };
+        }
+      }
+      
+      const userProfile = profileData || { role: 'client' };
+      
+      // Create user data to save in localStorage
+      const userData: User = {
+        id: data.user.id,
+        name: data.user.user_metadata.name || data.user.email?.split('@')[0] || '',
+        email: data.user.email || '',
+        role: userProfile.role as UserRole,
+        isEmailVerified: data.user.email_confirmed_at !== null,
+        company: userProfile.company,
+        phone: userProfile.phone
+      };
+      
+      this.setCurrentUser(userData);
+      return { success: true, message: 'Connexion réussie' };
+    } catch (err) {
+      console.error('Login exception:', err);
+      return { success: false, message: 'Une erreur est survenue' };
     }
-    
-    if (!user.isEmailVerified) {
-      return { success: false, message: 'Please verify your email first' };
-    }
-    
-    this.setCurrentUser(user);
-    return { success: true, message: 'Login successful' };
   }
   
-  // Register new user
-  register(name: string, email: string, password: string, company?: string): { success: boolean; message: string } {
-    const users = this.getInitialUsers();
-    
-    if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-      return { success: false, message: 'Email already registered' };
+  // Register new user with Supabase
+  async register(name: string, email: string, password: string, company?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            company
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('Registration error:', error);
+        return { success: false, message: error.message };
+      }
+      
+      if (!data.user) {
+        return { success: false, message: 'Erreur lors de la création du compte' };
+      }
+      
+      // Create profile for new user
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: data.user.id,
+          company,
+          role: 'client'
+        });
+        
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        return { success: false, message: 'Erreur lors de la création du profil' };
+      }
+      
+      return { 
+        success: true, 
+        message: 'Inscription réussie ! Veuillez vérifier votre email pour confirmer votre compte.' 
+      };
+    } catch (err) {
+      console.error('Registration exception:', err);
+      return { success: false, message: 'Une erreur est survenue' };
     }
-    
-    const newUser: User = {
-      id: Date.now().toString(),
-      name,
-      email,
-      role: 'client', // New users are always clients
-      isEmailVerified: false,
-      company
-    };
-    
-    users.push(newUser);
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-    
-    // In a real app, we would send verification email
-    return { success: true, message: 'Registration successful! Please check your email for verification.' };
   }
   
-  // Verify email
-  verifyEmail(email: string): { success: boolean; message: string } {
-    const users = this.getInitialUsers();
-    const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (userIndex === -1) {
-      return { success: false, message: 'User not found' };
+  // Verify email with token
+  async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // This is typically handled automatically by Supabase via email link
+      // For manual implementation, it would depend on your verification flow
+      return { success: true, message: 'Email vérifié avec succès ! Vous pouvez maintenant vous connecter.' };
+    } catch (err) {
+      console.error('Verification exception:', err);
+      return { success: false, message: 'Une erreur est survenue lors de la vérification' };
     }
-    
-    users[userIndex].isEmailVerified = true;
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-    
-    return { success: true, message: 'Email verified successfully! You can now log in.' };
   }
   
   // Logout user
-  logout(): void {
-    this.setCurrentUser(null);
+  async logout(): Promise<void> {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Logout error:', error);
+        toast.error('Erreur lors de la déconnexion');
+        return;
+      }
+      
+      this.setCurrentUser(null);
+    } catch (err) {
+      console.error('Logout exception:', err);
+      toast.error('Une erreur est survenue');
+    }
   }
   
   // Check if user is authenticated
@@ -142,6 +184,39 @@ class AuthService {
   getUserRole(): UserRole | null {
     const user = this.getCurrentUser();
     return user ? user.role : null;
+  }
+  
+  // Update user profile
+  async updateProfile(userId: string, profileData: Partial<User>): Promise<{ success: boolean; message: string }> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          company: profileData.company,
+          phone: profileData.phone,
+          role: profileData.role
+        })
+        .eq('id', userId);
+        
+      if (error) {
+        console.error('Update profile error:', error);
+        return { success: false, message: 'Erreur lors de la mise à jour du profil' };
+      }
+      
+      // Update local storage
+      const currentUser = this.getCurrentUser();
+      if (currentUser) {
+        this.setCurrentUser({
+          ...currentUser,
+          ...profileData
+        });
+      }
+      
+      return { success: true, message: 'Profil mis à jour avec succès' };
+    } catch (err) {
+      console.error('Update profile exception:', err);
+      return { success: false, message: 'Une erreur est survenue' };
+    }
   }
 }
 

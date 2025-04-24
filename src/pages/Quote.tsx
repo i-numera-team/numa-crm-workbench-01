@@ -1,7 +1,9 @@
 
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
-import React from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from 'sonner';
 
 interface LineItemType {
   offre: string;
@@ -14,6 +16,35 @@ interface LineItemType {
 export default function Quote() {
   const { cartItems, totalPrice } = useCart();
   const { user } = useAuth();
+  const [offers, setOffers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    async function fetchOffers() {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('offers')
+          .select('*')
+          .eq('is_active', true);
+          
+        if (error) {
+          console.error('Error fetching offers:', error);
+          toast.error('Erreur lors du chargement des offres');
+          return;
+        }
+        
+        setOffers(data || []);
+      } catch (err) {
+        console.error('Exception:', err);
+        toast.error('Une erreur est survenue');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchOffers();
+  }, []);
   
   const lineItems: LineItemType[] = cartItems.map(item => ({
     offre: item.offerTitle,

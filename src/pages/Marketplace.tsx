@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import { mockDataService, Offer } from '@/utils/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { Card } from '@/components/ui/card';
@@ -18,6 +17,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Plus, Search, Filter, ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from "@/integrations/supabase/client";
+
+export type Offer = {
+  id: string;
+  name: string;
+  description: string;
+  price_monthly: number;
+  setup_fee: number;
+  sector_id: string | null;
+  category: string;
+  image_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function Marketplace() {
   const { user } = useAuth();
@@ -31,103 +45,193 @@ export default function Marketplace() {
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const [confirmDeleteDialogOpen, setConfirmDeleteDialogOpen] = useState(false);
   const [offerToDelete, setOfferToDelete] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   // New offer form state
   const [newOffer, setNewOffer] = useState({
-    title: '',
+    name: '',
     description: '',
     category: '',
-    price: 0,
-    image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww'
+    price_monthly: 0,
+    setup_fee: 0,
+    image_url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww'
   });
 
   useEffect(() => {
-    // Load offers and extract unique categories
-    const loadedOffers = mockDataService.getOffers();
-    setOffers(loadedOffers);
+    async function fetchOffers() {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('offers')
+          .select('*')
+          .eq('is_active', true);
+          
+        if (error) {
+          console.error('Error fetching offers:', error);
+          toast.error('Erreur lors du chargement des offres');
+          return;
+        }
+        
+        setOffers(data || []);
+        
+        // Extract unique categories
+        const uniqueCategories = Array.from(
+          new Set(data?.map(offer => offer.category) || [])
+        );
+        setCategories(uniqueCategories);
+      } catch (err) {
+        console.error('Exception:', err);
+        toast.error('Une erreur est survenue');
+      } finally {
+        setIsLoading(false);
+      }
+    }
     
-    const uniqueCategories = Array.from(
-      new Set(loadedOffers.map(offer => offer.category))
-    );
-    setCategories(uniqueCategories);
+    fetchOffers();
   }, []);
 
   // Filter offers based on search query and selected category
   const filteredOffers = offers.filter(offer => {
-    const matchesSearch = offer.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = offer.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           offer.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || offer.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const handleAddToCart = (offer: Offer) => {
-    addToCart(offer);
-  };
-
-  const handleAddNewOffer = () => {
-    if (user?.role !== 'admin') {
-      toast.error('Only administrators can add new offers');
-      return;
-    }
-    
-    if (!newOffer.title || !newOffer.description || !newOffer.category || newOffer.price <= 0) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-    
-    const createdOffer = mockDataService.addOffer(newOffer);
-    setOffers([...offers, createdOffer]);
-    setShowAddOfferDialog(false);
-    toast.success('Offer added successfully');
-    
-    // Reset form
-    setNewOffer({
-      title: '',
-      description: '',
-      category: '',
-      price: 0,
-      image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww'
+    addToCart({
+      offerId: offer.id,
+      offerTitle: offer.name,
+      price: offer.setup_fee,
+      quantity: 1
     });
-    
-    // Update categories list if new category added
-    if (!categories.includes(createdOffer.category)) {
-      setCategories([...categories, createdOffer.category]);
-    }
+    toast.success(`${offer.name} ajouté au panier`);
   };
 
-  const handleEditOffer = () => {
-    if (!editingOffer || user?.role !== 'admin') return;
+  const handleAddNewOffer = async () => {
+    if (user?.role !== 'admin') {
+      toast.error('Seuls les administrateurs peuvent ajouter de nouvelles offres');
+      return;
+    }
     
-    const updatedOffer = mockDataService.updateOffer(editingOffer.id, editingOffer);
+    if (!newOffer.name || !newOffer.description || !newOffer.category || newOffer.price_monthly <= 0 || newOffer.setup_fee <= 0) {
+      toast.error('Veuillez remplir tous les champs requis');
+      return;
+    }
     
-    if (updatedOffer) {
-      const updatedOffers = offers.map(o => o.id === updatedOffer.id ? updatedOffer : o);
-      setOffers(updatedOffers);
-      
-      // Update categories if needed
-      if (!categories.includes(updatedOffer.category)) {
-        setCategories([...categories, updatedOffer.category]);
+    try {
+      const { data, error } = await supabase
+        .from('offers')
+        .insert([
+          {
+            name: newOffer.name,
+            description: newOffer.description,
+            category: newOffer.category,
+            price_monthly: newOffer.price_monthly,
+            setup_fee: newOffer.setup_fee,
+            image_url: newOffer.image_url,
+            is_active: true
+          }
+        ])
+        .select();
+        
+      if (error) {
+        console.error('Error adding offer:', error);
+        toast.error("Erreur lors de l'ajout de l'offre");
+        return;
       }
       
-      toast.success('Offer updated successfully');
-    } else {
-      toast.error('Failed to update offer');
+      if (data && data.length > 0) {
+        setOffers([...offers, data[0]]);
+        setShowAddOfferDialog(false);
+        toast.success('Offre ajoutée avec succès');
+        
+        // Reset form
+        setNewOffer({
+          name: '',
+          description: '',
+          category: '',
+          price_monthly: 0,
+          setup_fee: 0,
+          image_url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww'
+        });
+        
+        // Update categories list if new category added
+        if (!categories.includes(data[0].category)) {
+          setCategories([...categories, data[0].category]);
+        }
+      }
+    } catch (err) {
+      console.error('Exception:', err);
+      toast.error('Une erreur est survenue');
+    }
+  };
+
+  const handleEditOffer = async () => {
+    if (!editingOffer || user?.role !== 'admin') return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('offers')
+        .update({
+          name: editingOffer.name,
+          description: editingOffer.description,
+          category: editingOffer.category,
+          price_monthly: editingOffer.price_monthly,
+          setup_fee: editingOffer.setup_fee,
+          image_url: editingOffer.image_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingOffer.id)
+        .select();
+        
+      if (error) {
+        console.error('Error updating offer:', error);
+        toast.error("Erreur lors de la mise à jour de l'offre");
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        const updatedOffers = offers.map(o => o.id === data[0].id ? data[0] : o);
+        setOffers(updatedOffers);
+        
+        // Update categories if needed
+        if (!categories.includes(data[0].category)) {
+          setCategories([...categories, data[0].category]);
+        }
+        
+        toast.success('Offre mise à jour avec succès');
+      }
+    } catch (err) {
+      console.error('Exception:', err);
+      toast.error('Une erreur est survenue');
     }
     
     setShowEditOfferDialog(false);
     setEditingOffer(null);
   };
 
-  const handleDeleteOffer = () => {
+  const handleDeleteOffer = async () => {
     if (!offerToDelete || user?.role !== 'admin') return;
     
-    const success = mockDataService.deleteOffer(offerToDelete);
-    
-    if (success) {
+    try {
+      // Soft delete by setting is_active to false
+      const { error } = await supabase
+        .from('offers')
+        .update({ is_active: false })
+        .eq('id', offerToDelete);
+        
+      if (error) {
+        console.error('Error deleting offer:', error);
+        toast.error("Erreur lors de la suppression de l'offre");
+        return;
+      }
+      
       setOffers(offers.filter(o => o.id !== offerToDelete));
-      toast.success('Offer deleted successfully');
-    } else {
-      toast.error('Failed to delete offer');
+      toast.success('Offre supprimée avec succès');
+    } catch (err) {
+      console.error('Exception:', err);
+      toast.error('Une erreur est survenue');
     }
     
     setConfirmDeleteDialogOpen(false);
@@ -151,7 +255,7 @@ export default function Marketplace() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Marketplace</h1>
-          <p className="text-muted-foreground">Browse and select offers</p>
+          <p className="text-muted-foreground">Découvrez et sélectionnez nos offres</p>
         </div>
         {isAdmin && (
           <Button 
@@ -159,7 +263,7 @@ export default function Marketplace() {
             onClick={() => setShowAddOfferDialog(true)}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add New Offer
+            Ajouter une offre
           </Button>
         )}
       </div>
@@ -169,7 +273,7 @@ export default function Marketplace() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search offers..."
+            placeholder="Rechercher des offres..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -181,7 +285,7 @@ export default function Marketplace() {
             onChange={(e) => setSelectedCategory(e.target.value || null)}
             className="w-full p-2 border rounded-md bg-white"
           >
-            <option value="">All Categories</option>
+            <option value="">Toutes les catégories</option>
             {categories.map((category) => (
               <option key={category} value={category}>{category}</option>
             ))}
@@ -190,75 +294,81 @@ export default function Marketplace() {
       </div>
 
       {/* Offers grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredOffers.length > 0 ? (
-          filteredOffers.map((offer) => (
-            <Card key={offer.id} className="overflow-hidden flex flex-col h-full">
-              <div className="relative h-48">
-                <img
-                  src={offer.image}
-                  alt={offer.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
-                  <span className="text-white text-sm font-medium px-2 py-1 rounded-full bg-black bg-opacity-50">
-                    {offer.category}
-                  </span>
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-numa-500"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredOffers.length > 0 ? (
+            filteredOffers.map((offer) => (
+              <Card key={offer.id} className="overflow-hidden flex flex-col h-full">
+                <div className="relative h-48">
+                  <img
+                    src={offer.image_url || 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww'}
+                    alt={offer.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
+                    <span className="text-white text-sm font-medium px-2 py-1 rounded-full bg-black bg-opacity-50">
+                      {offer.category}
+                    </span>
+                  </div>
+                  {isAdmin && (
+                    <div className="absolute top-2 right-2 flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => openEditDialog(offer)}
+                        className="w-8 h-8 p-0 rounded-full bg-white bg-opacity-80 hover:bg-white"
+                      >
+                        <Edit className="h-4 w-4 text-gray-600" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => confirmDelete(offer.id)}
+                        className="w-8 h-8 p-0 rounded-full bg-white bg-opacity-80 hover:bg-white"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                {isAdmin && (
-                  <div className="absolute top-2 right-2 flex space-x-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => openEditDialog(offer)}
-                      className="w-8 h-8 p-0 rounded-full bg-white bg-opacity-80 hover:bg-white"
-                    >
-                      <Edit className="h-4 w-4 text-gray-600" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => confirmDelete(offer.id)}
-                      className="w-8 h-8 p-0 rounded-full bg-white bg-opacity-80 hover:bg-white"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                <div className="p-6 flex-1 flex flex-col">
+                  <h3 className="text-xl font-semibold">{offer.name}</h3>
+                  <p className="text-gray-500 my-2 flex-1">{offer.description}</p>
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-xl font-bold">{offer.setup_fee}€</span>
+                    <Button onClick={() => handleAddToCart(offer)} className="bg-numa-500 hover:bg-numa-600">
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Ajouter
                     </Button>
                   </div>
-                )}
-              </div>
-              <div className="p-6 flex-1 flex flex-col">
-                <h3 className="text-xl font-semibold">{offer.title}</h3>
-                <p className="text-gray-500 my-2 flex-1">{offer.description}</p>
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-xl font-bold">${offer.price}</span>
-                  <Button onClick={() => handleAddToCart(offer)} className="bg-numa-500 hover:bg-numa-600">
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Add to Cart
-                  </Button>
                 </div>
-              </div>
-            </Card>
-          ))
-        ) : (
-          <div className="col-span-3 text-center py-10">
-            <p className="text-gray-500">No offers found. Try adjusting your search.</p>
-          </div>
-        )}
-      </div>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-3 text-center py-10">
+              <p className="text-gray-500">Aucune offre trouvée. Essayez d'ajuster votre recherche.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add new offer dialog */}
       <Dialog open={showAddOfferDialog} onOpenChange={setShowAddOfferDialog}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Add New Offer</DialogTitle>
+            <DialogTitle>Ajouter une nouvelle offre</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Nom</Label>
               <Input
                 id="title"
-                value={newOffer.title}
-                onChange={(e) => setNewOffer({ ...newOffer, title: e.target.value })}
+                value={newOffer.name}
+                onChange={(e) => setNewOffer({ ...newOffer, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -272,7 +382,7 @@ export default function Marketplace() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">Catégorie</Label>
                 <Input
                   id="category"
                   list="categories"
@@ -284,31 +394,41 @@ export default function Marketplace() {
                 </datalist>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price">Price ($)</Label>
+                <Label htmlFor="price_monthly">Prix mensuel (€)</Label>
                 <Input
-                  id="price"
+                  id="price_monthly"
                   type="number"
                   min="0"
-                  value={newOffer.price || ''}
-                  onChange={(e) => setNewOffer({ ...newOffer, price: parseFloat(e.target.value) || 0 })}
+                  value={newOffer.price_monthly || ''}
+                  onChange={(e) => setNewOffer({ ...newOffer, price_monthly: parseFloat(e.target.value) || 0 })}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="image">Image URL</Label>
+              <Label htmlFor="setup_fee">Frais d'installation (€)</Label>
               <Input
-                id="image"
-                value={newOffer.image}
-                onChange={(e) => setNewOffer({ ...newOffer, image: e.target.value })}
+                id="setup_fee"
+                type="number"
+                min="0"
+                value={newOffer.setup_fee || ''}
+                onChange={(e) => setNewOffer({ ...newOffer, setup_fee: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="image_url">URL de l'image</Label>
+              <Input
+                id="image_url"
+                value={newOffer.image_url}
+                onChange={(e) => setNewOffer({ ...newOffer, image_url: e.target.value })}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddOfferDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button className="bg-numa-500 hover:bg-numa-600" onClick={handleAddNewOffer}>
-              Add Offer
+              Ajouter l'offre
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -318,16 +438,16 @@ export default function Marketplace() {
       <Dialog open={showEditOfferDialog} onOpenChange={setShowEditOfferDialog}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Edit Offer</DialogTitle>
+            <DialogTitle>Modifier l'offre</DialogTitle>
           </DialogHeader>
           {editingOffer && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-title">Title</Label>
+                <Label htmlFor="edit-name">Nom</Label>
                 <Input
-                  id="edit-title"
-                  value={editingOffer.title}
-                  onChange={(e) => setEditingOffer({ ...editingOffer, title: e.target.value })}
+                  id="edit-name"
+                  value={editingOffer.name}
+                  onChange={(e) => setEditingOffer({ ...editingOffer, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -341,7 +461,7 @@ export default function Marketplace() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-category">Category</Label>
+                  <Label htmlFor="edit-category">Catégorie</Label>
                   <Input
                     id="edit-category"
                     list="edit-categories"
@@ -353,32 +473,42 @@ export default function Marketplace() {
                   </datalist>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-price">Price ($)</Label>
+                  <Label htmlFor="edit-price_monthly">Prix mensuel (€)</Label>
                   <Input
-                    id="edit-price"
+                    id="edit-price_monthly"
                     type="number"
                     min="0"
-                    value={editingOffer.price}
-                    onChange={(e) => setEditingOffer({ ...editingOffer, price: parseFloat(e.target.value) || 0 })}
+                    value={editingOffer.price_monthly}
+                    onChange={(e) => setEditingOffer({ ...editingOffer, price_monthly: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-image">Image URL</Label>
+                <Label htmlFor="edit-setup_fee">Frais d'installation (€)</Label>
                 <Input
-                  id="edit-image"
-                  value={editingOffer.image}
-                  onChange={(e) => setEditingOffer({ ...editingOffer, image: e.target.value })}
+                  id="edit-setup_fee"
+                  type="number"
+                  min="0"
+                  value={editingOffer.setup_fee}
+                  onChange={(e) => setEditingOffer({ ...editingOffer, setup_fee: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-image_url">URL de l'image</Label>
+                <Input
+                  id="edit-image_url"
+                  value={editingOffer.image_url || ''}
+                  onChange={(e) => setEditingOffer({ ...editingOffer, image_url: e.target.value })}
                 />
               </div>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditOfferDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button className="bg-numa-500 hover:bg-numa-600" onClick={handleEditOffer}>
-              Update Offer
+              Mettre à jour
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -388,17 +518,17 @@ export default function Marketplace() {
       <Dialog open={confirmDeleteDialogOpen} onOpenChange={setConfirmDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Delete Offer</DialogTitle>
+            <DialogTitle>Supprimer l'offre</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p>Are you sure you want to delete this offer? This action cannot be undone.</p>
+            <p>Êtes-vous sûr de vouloir supprimer cette offre ? Cette action ne peut pas être annulée.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDeleteDialogOpen(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button variant="destructive" onClick={handleDeleteOffer}>
-              Delete
+              Supprimer
             </Button>
           </DialogFooter>
         </DialogContent>
