@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface Offer {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   price_monthly: number;
   setup_fee: number;
   sector_id: string | null;
@@ -70,7 +70,7 @@ export default function Marketplace() {
   
   const handleAddToCart = (offer: Offer) => {
     addToCart({
-      offerId: offer.id,
+      offerId: offer.id, // Use offer.id instead of non-existent offerId property
       offerTitle: offer.name,
       price: offer.price_monthly,
       quantity: 1

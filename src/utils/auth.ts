@@ -86,8 +86,9 @@ class AuthService {
         email: data.user.email || '',
         role: userProfile.role as UserRole,
         isEmailVerified: data.user.email_confirmed_at !== null,
-        company: userProfile.company || undefined,
-        phone: userProfile.phone || undefined
+        // Add type checks for optional properties
+        company: 'company' in userProfile ? userProfile.company || undefined : undefined,
+        phone: 'phone' in userProfile ? userProfile.phone || undefined : undefined
       };
       
       this.setCurrentUser(userData);
