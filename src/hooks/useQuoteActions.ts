@@ -95,23 +95,15 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       const dossierId = `mock-dossier-${Date.now()}`;
       console.log('Using mock dossier ID:', dossierId);
       
-      // Create a mock quote instead
-      const quoteId = `mock-quote-${Date.now()}`;
-      
+      // Create a mock quote with the mockDataService
       mockDataService.createQuote({
-        id: quoteId,
         dossierId,
         clientId: user.id,
         clientName: user.name || 'Unknown Client',
-        agentId: null,
-        agentName: null,
+        agentId: null, // This can be null as documented in the mockDataService interface
+        agentName: null, // This can be null as documented in the mockDataService interface
         status: 'pending_admin',
         totalPrice: totalPrice * 1.2,
-        bankDetails: {
-          bankName: bankDetails.bankName,
-          iban: bankDetails.iban,
-          bic: bankDetails.bic
-        },
         items: cartItems.map(item => ({
           offerId: item.offerId,
           offerTitle: item.offerTitle || item.name,
