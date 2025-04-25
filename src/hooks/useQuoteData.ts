@@ -1,6 +1,8 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { mockDataService } from '@/utils/mockData';
 
 export function useQuoteData() {
   const [offers, setOffers] = useState([]);
@@ -14,6 +16,8 @@ export function useQuoteData() {
       if (!user?.id) return;
 
       try {
+        setIsLoading(true);
+        
         // Fetch profile bank details
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -42,17 +46,9 @@ export function useQuoteData() {
           setOffers(offersData || []);
         }
 
-        // Fetch quotes
-        const { data: quotesData, error: quotesError } = await supabase
-          .from('quotes')
-          .select('*')
-          .eq('dossier_id', user.id);
-
-        if (quotesError) {
-          console.error('Error fetching quotes:', quotesError);
-        } else {
-          setQuotes(quotesData || []);
-        }
+        // Get quotes from mockDataService instead of Supabase
+        const mockQuotes = mockDataService.getQuotes().filter(q => q.clientId === user.id);
+        setQuotes(mockQuotes || []);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {

@@ -31,7 +31,7 @@ export function BankDetailsForm({ onSubmit, isLoading = false }: {
       return;
     }
 
-    // Validation basique pour IBAN et BIC
+    // Basic validation for IBAN and BIC
     if (bankDetails.iban.length < 15 || bankDetails.iban.length > 34) {
       toast.error('L\'IBAN semble être invalide');
       return;
@@ -47,13 +47,8 @@ export function BankDetailsForm({ onSubmit, isLoading = false }: {
       return;
     }
 
-    try {
-      // Proceed directly with quote creation using the bank details
-      onSubmit(bankDetails);
-    } catch (error) {
-      toast.error('Erreur lors de la mise à jour des informations bancaires');
-      console.error(error);
-    }
+    // Pass the bank details to the parent component
+    onSubmit(bankDetails);
   };
 
   return (
