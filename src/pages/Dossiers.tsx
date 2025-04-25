@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockDataService, Dossier } from '@/utils/mockData';
+import { dossierService } from '@/services/dossierService';
+import { Dossier } from '@/types/mock';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Dossiers() {
   const { user } = useAuth();
@@ -56,20 +58,31 @@ export default function Dossiers() {
   });
 
   useEffect(() => {
-    // Load dossiers based on user role
-    let loadedDossiers: Dossier[];
+    const loadDossiers = async () => {
+      try {
+        setLoading(true);
+        let loadedDossiers: Dossier[] = [];
+        
+        loadedDossiers = await dossierService.getDossiers();
+        
+        // Filter by user role
+        if (user?.role === 'client') {
+          loadedDossiers = loadedDossiers.filter(d => d.clientId === user.id);
+        }
+        
+        setDossiers(loadedDossiers);
+        setFilteredDossiers(loadedDossiers);
+      } catch (error) {
+        console.error("Failed to load dossiers:", error);
+        toast.error("Erreur lors du chargement des dossiers");
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    if (user?.role === 'client') {
-      // Client can only see their own dossiers
-      loadedDossiers = mockDataService.getDossiersByClientId(user.id);
-    } else {
-      // Agent and admin can see all dossiers
-      loadedDossiers = mockDataService.getDossiers();
+    if (user) {
+      loadDossiers();
     }
-    
-    setDossiers(loadedDossiers);
-    setFilteredDossiers(loadedDossiers);
-    setLoading(false);
   }, [user]);
 
   // Filter dossiers when search query or status filter changes
@@ -93,66 +106,107 @@ export default function Dossiers() {
   }, [dossiers, searchQuery, statusFilter]);
 
   // Handle creating a new dossier (Agent/Admin only)
-  const handleCreateDossier = () => {
+  const handleCreateDossier = async () => {
     if (!user || (user.role !== 'agent' && user.role !== 'admin')) {
-      toast.error('Only agents and administrators can create dossiers');
+      toast.error('Seuls les agents et les administrateurs peuvent créer des dossiers');
       return;
     }
     
     if (!newDossier.clientName || !newDossier.clientEmail || !newDossier.company) {
-      toast.error('Please fill all required fields');
+      toast.error('Veuillez remplir tous les champs requis');
       return;
     }
     
-    // Create a new dossier
-    const createdDossier = mockDataService.createDossier({
-      clientId: '0', // This would be a real client ID in a real app
-      clientName: newDossier.clientName,
-      clientEmail: newDossier.clientEmail,
-      company: newDossier.company,
-      status: 'new',
-      agentId: user.id,
-      agentName: user.name
-    });
-    
-    // Add the new dossier to the list
-    setDossiers([createdDossier, ...dossiers]);
-    setShowNewDossierDialog(false);
-    toast.success('Dossier created successfully');
-    
-    // Reset form
-    setNewDossier({
-      clientName: '',
-      clientEmail: '',
-      company: '',
-      status: 'new'
-    });
-    
-    // Navigate to new dossier
-    navigate(`/dossiers/${createdDossier.id}`);
+    try {
+      // First, check if the client exists or create a new one
+      const { data: existingUsers, error: userError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', newDossier.clientEmail)
+        .single();
+      
+      let clientId = existingUsers?.id;
+      
+      if (userError || !clientId) {
+        // Create a new client profile
+        const { data: newUser, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: crypto.randomUUID(), // Generate a new UUID
+            email: newDossier.clientEmail,
+            company: newDossier.company,
+            role: 'client'
+          })
+          .select()
+          .single();
+          
+        if (createError) {
+          toast.error('Erreur lors de la création du client');
+          console.error(createError);
+          return;
+        }
+        
+        clientId = newUser.id;
+      }
+      
+      // Create a new dossier
+      const createdDossier = await dossierService.createDossier({
+        clientId,
+        clientName: newDossier.clientName,
+        clientEmail: newDossier.clientEmail,
+        company: newDossier.company,
+        status: 'new',
+        agentId: user.id,
+        agentName: user.name
+      });
+      
+      // Add the new dossier to the list
+      setDossiers([createdDossier, ...dossiers]);
+      setShowNewDossierDialog(false);
+      toast.success('Dossier créé avec succès');
+      
+      // Reset form
+      setNewDossier({
+        clientName: '',
+        clientEmail: '',
+        company: '',
+        status: 'new'
+      });
+      
+      // Navigate to new dossier
+      navigate(`/dossiers/${createdDossier.id}`);
+    } catch (error) {
+      console.error("Erreur lors de la création du dossier:", error);
+      toast.error("Erreur lors de la création du dossier");
+    }
   };
 
   // Handle deleting a dossier (Admin only)
-  const handleDeleteDossier = () => {
+  const handleDeleteDossier = async () => {
     if (!dossierToDelete || user?.role !== 'admin') return;
     
-    const success = mockDataService.deleteDossier(dossierToDelete);
-    
-    if (success) {
-      setDossiers(dossiers.filter(d => d.id !== dossierToDelete));
-      toast.success('Dossier deleted successfully');
-    } else {
-      toast.error('Failed to delete dossier');
+    try {
+      const success = await dossierService.deleteDossier(dossierToDelete);
+      
+      if (success) {
+        setDossiers(dossiers.filter(d => d.id !== dossierToDelete));
+        toast.success('Dossier supprimé avec succès');
+      } else {
+        toast.error('Échec de la suppression du dossier');
+      }
+    } catch (error) {
+      console.error("Erreur lors de la suppression du dossier:", error);
+      toast.error("Erreur lors de la suppression du dossier");
+    } finally {
+      setShowDeleteDialog(false);
+      setDossierToDelete(null);
     }
-    
-    setShowDeleteDialog(false);
-    setDossierToDelete(null);
   };
 
   // Show delete confirmation dialog
   const confirmDelete = (dossierId: string) => {
     if (user?.role !== 'admin') {
-      toast.error('Only administrators can delete dossiers');
+      toast.error('Seuls les administrateurs peuvent supprimer des dossiers');
       return;
     }
     

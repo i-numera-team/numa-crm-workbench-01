@@ -1,7 +1,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { mockQuoteService, Quote } from '@/utils/mockData';
+import { quoteService } from '@/services/quoteService';
+import { SupabaseQuote, SupabaseQuoteItem } from '@/types/supabase';
+import { Quote, CartItem } from '@/types/mock';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +24,8 @@ import { useNotifications } from '@/hooks/useNotifications';
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quote, setQuote] = useState<SupabaseQuote | null>(null);
+  const [quoteItems, setQuoteItems] = useState<SupabaseQuoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSignDialog, setShowSignDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -36,22 +39,34 @@ export default function QuoteDetail() {
   });
 
   useEffect(() => {
-    if (!id) return;
+    const loadQuote = async () => {
+      if (!id) return;
 
-    // Load quote details
-    const loadedQuote = mockQuoteService.getQuoteById(id);
-    setQuote(loadedQuote || null);
+      try {
+        setLoading(true);
+        
+        // Load quote details from Supabase
+        const { quote: loadedQuote, items } = await quoteService.getQuoteById(id);
+        setQuote(loadedQuote);
+        setQuoteItems(items);
+        
+        // Extract bank details if available
+        if (loadedQuote) {
+          setBankDetails({
+            bankName: loadedQuote.bank_name || '',
+            iban: loadedQuote.iban || '',
+            bic: loadedQuote.bic || ''
+          });
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement du devis:", error);
+        toast.error("Erreur lors du chargement du devis");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // Extract bank details if available
-    if (loadedQuote) {
-      setBankDetails({
-        bankName: loadedQuote.bankName || '',
-        iban: loadedQuote.iban || '',
-        bic: loadedQuote.bic || ''
-      });
-    }
-
-    setLoading(false);
+    loadQuote();
   }, [id]);
 
   // Check if user has access to this quote
@@ -62,7 +77,7 @@ export default function QuoteDetail() {
     if (user.role === 'agent') return true; // Agent can access all
     
     // Client can only access their own quotes
-    return user.role === 'client' && quote.clientId === user.id;
+    return user.role === 'client' && quote.client_id === user.id;
   };
 
   // Format date for display
@@ -81,7 +96,7 @@ export default function QuoteDetail() {
         <span className="flex items-start">
           <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
           <span>
-            Ce devis a été approuvé et signé le {formatDate(quote.signedAt || quote.updatedAt)}.
+            Ce devis a été approuvé et signé le {formatDate(quote.signed_at || quote.updated_at)}.
           </span>
         </span>
       );
@@ -90,7 +105,7 @@ export default function QuoteDetail() {
         <span className="flex items-start">
           <XCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
           <span>
-            Ce devis a été rejeté le {formatDate(quote.rejectedAt || quote.updatedAt)}.
+            Ce devis a été rejeté le {formatDate(quote.rejected_at || quote.updated_at)}.
           </span>
         </span>
       );
@@ -110,55 +125,56 @@ export default function QuoteDetail() {
   };
 
   // Handle signing quote
-  const handleSignQuote = () => {
+  const handleSignQuote = async () => {
     if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
     
     setSigningQuote(true);
     
-    // Simulate signing delay
-    setTimeout(() => {
-      const updatedQuote = mockQuoteService.updateQuoteStatus(
+    try {
+      // Update quote status in Supabase
+      const updatedQuote = await quoteService.updateQuoteStatus(
         quote.id, 
-        'signed',
+        'signed' as 'draft' | 'pending' | 'approved' | 'signed' | 'rejected',
         user.id,
         user.name
       );
       
-      if (updatedQuote) {
-        setQuote(updatedQuote);
-        toast.success('Devis signé avec succès');
-        
-        // Envoyer une notification à l'administrateur si c'est un client qui signe
-        if (user.role === 'client') {
-          addNotification({
-            userId: 'admin',
-            message: `Le client ${user.name} a signé le devis #${quote.id}`,
-            type: 'success',
-            read: false,
-            link: `/quotes/${quote.id}`,
-            title: 'Devis signé'
-          });
-        }
-        // Envoyer une notification au client si c'est l'admin qui signe
-        else if (user.role === 'admin' && quote.clientId) {
-          addNotification({
-            userId: quote.clientId,
-            message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
-            type: 'success',
-            read: false,
-            link: `/quotes/${quote.id}`,
-            title: 'Devis approuvé'
-          });
-        }
-      }
+      setQuote(updatedQuote);
+      toast.success('Devis signé avec succès');
       
+      // Envoyer une notification à l'administrateur si c'est un client qui signe
+      if (user.role === 'client') {
+        addNotification({
+          userId: 'admin',
+          message: `Le client ${user.name} a signé le devis #${quote.id}`,
+          type: 'success',
+          read: false,
+          link: `/quotes/${quote.id}`,
+          title: 'Devis signé'
+        });
+      }
+      // Envoyer une notification au client si c'est l'admin qui signe
+      else if (user.role === 'admin' && quote.client_id) {
+        addNotification({
+          userId: quote.client_id,
+          message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
+          type: 'success',
+          read: false,
+          link: `/quotes/${quote.id}`,
+          title: 'Devis approuvé'
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de la signature du devis:", error);
+      toast.error("Erreur lors de la signature du devis");
+    } finally {
       setSigningQuote(false);
       setShowSignDialog(false);
-    }, 1500);
+    }
   };
 
   // Handle rejecting quote
-  const handleRejectQuote = () => {
+  const handleRejectQuote = async () => {
     if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
     
     if (!rejectionReason.trim()) {
@@ -166,21 +182,21 @@ export default function QuoteDetail() {
       return;
     }
     
-    const updatedQuote = mockQuoteService.updateQuoteStatus(
-      quote.id, 
-      'rejected',
-      user.id,
-      user.name
-    );
-    
-    if (updatedQuote) {
+    try {
+      const updatedQuote = await quoteService.updateQuoteStatus(
+        quote.id, 
+        'rejected' as 'draft' | 'pending' | 'approved' | 'signed' | 'rejected',
+        user.id,
+        user.name
+      );
+      
       setQuote(updatedQuote);
       toast.success('Devis rejeté avec succès');
       
       // Envoyer des notifications
-      if (user.role === 'admin' && quote.clientId) {
+      if (user.role === 'admin' && quote.client_id) {
         addNotification({
-          userId: quote.clientId,
+          userId: quote.client_id,
           message: `Votre devis #${quote.id} a été rejeté par l'administrateur`,
           type: 'error',
           read: false,
@@ -197,10 +213,13 @@ export default function QuoteDetail() {
           title: 'Devis rejeté'
         });
       }
+    } catch (error) {
+      console.error("Erreur lors du rejet du devis:", error);
+      toast.error("Erreur lors du rejet du devis");
+    } finally {
+      setShowRejectDialog(false);
+      setRejectionReason('');
     }
-    
-    setShowRejectDialog(false);
-    setRejectionReason('');
   };
 
   // Determine if the current user can sign/reject the quote
@@ -216,7 +235,7 @@ export default function QuoteDetail() {
   };
 
   // Get status badge classes
-  const getStatusBadge = (status: Quote['status']) => {
+  const getStatusBadge = (status: string) => {
     let bgColor = '';
     let textColor = '';
     
@@ -249,6 +268,18 @@ export default function QuoteDetail() {
     return `${bgColor} ${textColor} px-3 py-1 rounded-full text-sm font-medium inline-block`;
   };
 
+  // Déterminer le statut en français
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'draft': return 'Brouillon';
+      case 'pending': return 'En attente';
+      case 'approved': return 'Approuvé';
+      case 'signed': return 'Signé';
+      case 'rejected': return 'Rejeté';
+      default: return status;
+    }
+  };
+
   // Show loading state
   if (loading) {
     return (
@@ -276,17 +307,13 @@ export default function QuoteDetail() {
     );
   }
 
-  // Déterminer le statut en français
-  const getStatusLabel = (status: Quote['status']) => {
-    switch (status) {
-      case 'draft': return 'Brouillon';
-      case 'pending': return 'En attente';
-      case 'approved': return 'Approuvé';
-      case 'signed': return 'Signé';
-      case 'rejected': return 'Rejeté';
-      default: return status;
-    }
-  };
+  // Construire les items du devis
+  const mockItems: CartItem[] = quoteItems.map(item => ({
+    offerId: item.offer_id,
+    offerTitle: item.offer?.name || 'Offre',
+    price: item.price,
+    quantity: item.quantity
+  }));
 
   return (
     <div className="space-y-6">
@@ -304,7 +331,7 @@ export default function QuoteDetail() {
             Devis #{quote.id}
           </h1>
           <p className="text-muted-foreground">
-            Créé le {formatDate(quote.createdAt)}
+            Créé le {formatDate(quote.created_at)}
           </p>
         </div>
         
@@ -331,35 +358,35 @@ export default function QuoteDetail() {
           <dl className="space-y-4">
             <div>
               <dt className="text-sm font-medium text-gray-500">Client</dt>
-              <dd className="mt-1">{quote.clientName}</dd>
+              <dd className="mt-1">{quote.client_name || 'N/A'}</dd>
             </div>
             
             <div>
               <dt className="text-sm font-medium text-gray-500">Créé par</dt>
-              <dd className="mt-1">{quote.agentName}</dd>
+              <dd className="mt-1">{quote.agent_name || 'N/A'}</dd>
             </div>
             
             <div>
               <dt className="text-sm font-medium text-gray-500">Créé le</dt>
-              <dd className="mt-1">{formatDate(quote.createdAt)}</dd>
+              <dd className="mt-1">{formatDate(quote.created_at)}</dd>
             </div>
             
             <div>
               <dt className="text-sm font-medium text-gray-500">Dernière mise à jour</dt>
-              <dd className="mt-1">{formatDate(quote.updatedAt)}</dd>
+              <dd className="mt-1">{formatDate(quote.updated_at)}</dd>
             </div>
             
-            {quote.signedAt && (
+            {quote.signed_at && (
               <div>
                 <dt className="text-sm font-medium text-gray-500">Signé le</dt>
-                <dd className="mt-1">{formatDate(quote.signedAt)}</dd>
+                <dd className="mt-1">{formatDate(quote.signed_at)}</dd>
               </div>
             )}
             
-            {quote.rejectedAt && (
+            {quote.rejected_at && (
               <div>
                 <dt className="text-sm font-medium text-gray-500">Rejeté le</dt>
-                <dd className="mt-1">{formatDate(quote.rejectedAt)}</dd>
+                <dd className="mt-1">{formatDate(quote.rejected_at)}</dd>
               </div>
             )}
           </dl>
@@ -411,10 +438,10 @@ export default function QuoteDetail() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {quote.items.map((item) => (
-                      <tr key={item.offerId}>
+                    {quoteItems.map((item) => (
+                      <tr key={item.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {item.offerTitle}
+                          {item.offer?.name || 'Offre'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
                           {item.quantity}
@@ -435,15 +462,15 @@ export default function QuoteDetail() {
               <div className="border-t pt-4">
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">Sous-total</span>
-                  <span className="text-sm font-medium">{quote.totalPrice.toFixed(2)} €</span>
+                  <span className="text-sm font-medium">{quote.total_price.toFixed(2)} €</span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">TVA (10%)</span>
-                  <span className="text-sm font-medium">{(quote.totalPrice * 0.1).toFixed(2)} €</span>
+                  <span className="text-sm font-medium">{(quote.total_price * 0.1).toFixed(2)} €</span>
                 </div>
                 <div className="flex justify-between py-2 border-t border-gray-200 mt-2">
                   <span className="text-base font-bold">Total</span>
-                  <span className="text-base font-bold">{(quote.totalPrice * 1.1).toFixed(2)} €</span>
+                  <span className="text-base font-bold">{(quote.total_price * 1.1).toFixed(2)} €</span>
                 </div>
               </div>
             </div>
@@ -461,7 +488,7 @@ export default function QuoteDetail() {
             {/* Link to dossier */}
             <div className="mt-6 pt-6 border-t">
               <Link 
-                to={`/dossiers/${quote.dossierId}`}
+                to={`/dossiers/${quote.dossier_id}`}
                 className="text-numa-500 hover:text-numa-600 hover:underline text-sm font-medium"
               >
                 Voir le dossier lié
@@ -476,8 +503,8 @@ export default function QuoteDetail() {
         <QuoteFooter 
           bankDetails={bankDetails}
           onAcceptQuote={() => setShowSignDialog(true)}
-          status={quote?.status || 'pending'}
-          quoteId={quote?.id}
+          status={quote.status as any}
+          quoteId={quote.id}
         />
       </div>
 
@@ -499,7 +526,7 @@ export default function QuoteDetail() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm">Total du devis:</span>
-                <span className="text-sm font-bold">{(quote.totalPrice * 1.1).toFixed(2)} €</span>
+                <span className="text-sm font-bold">{(quote.total_price * 1.1).toFixed(2)} €</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm">Date:</span>

@@ -24,26 +24,16 @@ type NavItem = {
   allowedRoles: UserRole[];
 };
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+interface SidebarProps {
+  collapsed: boolean;
+  toggleSidebar: () => void;
+  isMobile: boolean;
+}
+
+export default function Sidebar({ collapsed, toggleSidebar, isMobile }: SidebarProps) {
   const { pathname } = useLocation();
   const { userRole, logout } = useAuth();
   
-  // Sidebar responsive
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth < 768) {
-        setCollapsed(true);
-      }
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   const navItems: NavItem[] = [
     {
       title: 'Tableau de bord',
@@ -88,10 +78,6 @@ export default function Sidebar() {
       allowedRoles: ['admin']
     }
   ];
-
-  const toggleSidebar = () => {
-    setCollapsed(!collapsed);
-  };
 
   const filteredNavItems = navItems.filter(
     item => !userRole || item.allowedRoles.includes(userRole)
