@@ -16,7 +16,7 @@ export const mockDataService = {
   getQuotes: () => mockQuoteService.getQuotes(),
   getQuotesByClientId: (clientId: string) => mockQuoteService.getQuotesByClientId(clientId),
   getQuoteById: (quoteId: string) => mockQuoteService.getQuoteById(quoteId),
-  updateQuoteStatus: (quoteId: string, status: string, userId: string, userName: string) => 
+  updateQuoteStatus: (quoteId: string, status: "draft" | "pending" | "approved" | "signed" | "rejected", userId: string, userName: string) => 
     mockQuoteService.updateQuoteStatus(quoteId, status, userId, userName),
   createQuote: (quoteData: any) => mockQuoteService.createQuote(quoteData),
   
