@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,7 +28,7 @@ export function QuoteFooter({ bankDetails, onAcceptQuote, status, quoteId }: Quo
     if (user?.role === 'client' && quoteId) {
       addNotification({
         userId: 'admin', // Dans un vrai système, ce serait l'ID de l'administrateur
-        message: `Le devis #${quoteId} a été accepté par ${user.name || 'le client'}`,
+        message: `Le devis #${quoteId} a été accepté par ${user.name}`,
         type: 'success',
         read: false,
         link: `/quotes/${quoteId}`,
@@ -123,8 +124,8 @@ export function QuoteFooter({ bankDetails, onAcceptQuote, status, quoteId }: Quo
           </Button>
         )}
         
-        {/* Afficher le bouton d'acceptation uniquement pour les clients et si le statut est approuvé */}
-        {status === 'approved' && user?.role === 'client' && (
+        {/* Afficher le bouton d'acceptation uniquement pour les clients et si le statut est en attente */}
+        {status === 'pending' && user?.role === 'client' && (
           <Button 
             onClick={handleAcceptQuote}
             className="bg-green-600 hover:bg-green-700 text-white print:hidden"

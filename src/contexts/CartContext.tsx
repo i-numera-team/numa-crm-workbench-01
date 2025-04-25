@@ -1,112 +1,42 @@
 
-import React, { createContext, useContext, PropsWithChildren, useState, useEffect } from 'react';
-
-export interface CartItem {
-  offerId: string;
-  offerTitle: string;
-  price: number;
-  quantity: number;
-}
+import { createContext, useContext, ReactNode } from 'react';
+import { CartItem } from '../utils/mockData';
+import { useCartState } from '@/hooks/useCartState';
+import { useCartActions } from '@/hooks/useCartActions';
 
 interface CartContextType {
   cartItems: CartItem[];
   addToCart: (item: CartItem) => void;
-  removeFromCart: (offerId: string) => void;
   updateQuantity: (offerId: string, quantity: number) => void;
+  removeFromCart: (offerId: string) => void;
   clearCart: () => void;
+  totalItems: number;
   totalPrice: number;
-  cartCount: number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export const CartProvider: React.FC<PropsWithChildren> = ({ children }) => {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [cartCount, setCartCount] = useState(0);
-
-  // Load cart from localStorage on initial render
-  useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        setCartItems(parsedCart);
-      } catch (error) {
-        console.error('Erreur lors du chargement du panier:', error);
-        localStorage.removeItem('cart');
-      }
-    }
-  }, []);
-
-  // Update localStorage whenever cart changes
-  useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cartItems));
-    
-    // Calculate total price
-    const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    setTotalPrice(total);
-    
-    // Calculate total item count
-    const count = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    setCartCount(count);
-  }, [cartItems]);
-
-  const addToCart = (item: CartItem) => {
-    setCartItems(prevItems => {
-      const existingItemIndex = prevItems.findIndex(i => i.offerId === item.offerId);
-      
-      if (existingItemIndex >= 0) {
-        // Item already exists, update quantity
-        const updatedItems = [...prevItems];
-        updatedItems[existingItemIndex].quantity += item.quantity;
-        return updatedItems;
-      } else {
-        // Item doesn't exist, add it
-        return [...prevItems, item];
-      }
-    });
-  };
-
-  const removeFromCart = (offerId: string) => {
-    setCartItems(prevItems => prevItems.filter(item => item.offerId !== offerId));
-  };
-
-  const updateQuantity = (offerId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(offerId);
-      return;
-    }
-
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.offerId === offerId ? { ...item, quantity } : item
-      )
-    );
-  };
-
-  const clearCart = () => {
-    setCartItems([]);
-    localStorage.removeItem('cart');
-  };
+export function CartProvider({ children }: { children: ReactNode }) {
+  const { cartItems, setCartItems, totalItems, totalPrice } = useCartState();
+  const { addToCart, updateQuantity, removeFromCart, clearCart } = useCartActions(setCartItems);
 
   const value = {
     cartItems,
     addToCart,
-    removeFromCart,
     updateQuantity,
+    removeFromCart,
     clearCart,
-    totalPrice,
-    cartCount
+    totalItems,
+    totalPrice
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
-};
+}
 
-export const useCart = () => {
+export function useCart() {
   const context = useContext(CartContext);
   if (context === undefined) {
     throw new Error('useCart must be used within a CartProvider');
   }
   return context;
-};
+}

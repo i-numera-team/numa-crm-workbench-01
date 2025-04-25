@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { mockQuoteService, Quote } from '@/utils/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,8 +18,6 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { QuoteFooter } from '@/components/quote/QuoteFooter';
 import { useNotifications } from '@/hooks/useNotifications';
-import { supabase } from '@/integrations/supabase/client';
-import { Quote } from '@/types/quote';
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
@@ -39,106 +38,34 @@ export default function QuoteDetail() {
   useEffect(() => {
     if (!id) return;
 
-    const fetchQuoteDetails = async () => {
-      try {
-        setLoading(true);
-        
-        const { data: quoteData, error: quoteError } = await supabase
-          .from('quotes')
-          .select(`
-            *,
-            quote_items(*),
-            dossiers!inner(
-              client_id,
-              agent_id
-            )
-          `)
-          .eq('id', id)
-          .single();
-        
-        if (quoteError) {
-          console.error('Erreur lors de la récupération du devis:', quoteError);
-          setLoading(false);
-          return;
-        }
-        
-        const { data: clientData, error: clientError } = await supabase
-          .from('profiles')
-          .select('email, company')
-          .eq('id', quoteData.dossiers.client_id)
-          .single();
-        
-        if (clientError) {
-          console.error('Erreur lors de la récupération du client:', clientError);
-        }
-        
-        let agentData = null;
-        if (quoteData.dossiers.agent_id) {
-          const { data: agent, error: agentError } = await supabase
-            .from('profiles')
-            .select('email')
-            .eq('id', quoteData.dossiers.agent_id)
-            .single();
-          
-          if (agentError) {
-            console.error('Erreur lors de la récupération de l\'agent:', agentError);
-          } else {
-            agentData = agent;
-          }
-        }
-        
-        const formattedQuote: Quote = {
-          id: quoteData.id,
-          clientId: quoteData.dossiers.client_id,
-          clientName: clientData?.company || clientData?.email.split('@')[0] || 'Client',
-          clientEmail: clientData?.email || '',
-          agentId: quoteData.dossiers.agent_id,
-          agentName: agentData?.email?.split('@')[0] || 'Agent',
-          createdAt: quoteData.created_at,
-          updatedAt: quoteData.updated_at,
-          totalPrice: quoteData.total_price,
-          status: quoteData.status as Quote['status'],
-          dossierId: quoteData.dossier_id,
-          bankName: quoteData.bank_name || '',
-          iban: quoteData.iban || '',
-          bic: quoteData.bic || '',
-          signedAt: quoteData.signed_at || undefined,
-          rejectedAt: quoteData.rejected_at || undefined,
-          items: quoteData.quote_items.map(item => ({
-            offerId: item.offer_id,
-            offerTitle: item.offer_title || 'Produit',
-            price: item.price,
-            quantity: item.quantity
-          }))
-        };
-        
-        setQuote(formattedQuote);
-        setBankDetails({
-          bankName: formattedQuote.bankName || '',
-          iban: formattedQuote.iban || '',
-          bic: formattedQuote.bic || ''
-        });
-        
-      } catch (error) {
-        console.error('Erreur lors du chargement du devis:', error);
-        toast.error('Erreur lors du chargement des données du devis');
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Load quote details
+    const loadedQuote = mockQuoteService.getQuoteById(id);
+    setQuote(loadedQuote || null);
 
-    fetchQuoteDetails();
+    // Extract bank details if available
+    if (loadedQuote) {
+      setBankDetails({
+        bankName: loadedQuote.bankName || '',
+        iban: loadedQuote.iban || '',
+        bic: loadedQuote.bic || ''
+      });
+    }
+
+    setLoading(false);
   }, [id]);
 
+  // Check if user has access to this quote
   const hasAccess = () => {
     if (!user || !quote) return false;
     
     if (user.role === 'admin') return true; // Admin can access all
     if (user.role === 'agent') return true; // Agent can access all
     
+    // Client can only access their own quotes
     return user.role === 'client' && quote.clientId === user.id;
   };
 
+  // Format date for display
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
       year: 'numeric',
@@ -147,6 +74,7 @@ export default function QuoteDetail() {
     });
   };
 
+  // Get status notes
   const getStatusNotes = () => {
     if (quote?.status === 'signed') {
       return (
@@ -181,93 +109,77 @@ export default function QuoteDetail() {
     return "Aucune note disponible.";
   };
 
-  const handleSignQuote = async () => {
-    if (!quote || !user?.id) return;
+  // Handle signing quote
+  const handleSignQuote = () => {
+    if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
     
     setSigningQuote(true);
     
-    try {
-      const { error } = await supabase
-        .from('quotes')
-        .update({
-          status: 'signed',
-          updated_at: new Date().toISOString(),
-          signed_at: new Date().toISOString()
-        })
-        .eq('id', quote.id);
+    // Simulate signing delay
+    setTimeout(() => {
+      const updatedQuote = mockQuoteService.updateQuoteStatus(
+        quote.id, 
+        'signed',
+        user.id,
+        user.name
+      );
       
-      if (error) {
-        throw error;
+      if (updatedQuote) {
+        setQuote(updatedQuote);
+        toast.success('Devis signé avec succès');
+        
+        // Envoyer une notification à l'administrateur si c'est un client qui signe
+        if (user.role === 'client') {
+          addNotification({
+            userId: 'admin',
+            message: `Le client ${user.name} a signé le devis #${quote.id}`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${quote.id}`,
+            title: 'Devis signé'
+          });
+        }
+        // Envoyer une notification au client si c'est l'admin qui signe
+        else if (user.role === 'admin' && quote.clientId) {
+          addNotification({
+            userId: quote.clientId,
+            message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${quote.id}`,
+            title: 'Devis approuvé'
+          });
+        }
       }
       
-      setQuote({
-        ...quote,
-        status: 'signed',
-        updatedAt: new Date().toISOString(),
-        signedAt: new Date().toISOString()
-      });
-      
-      toast.success('Devis signé avec succès');
-      
-      if (user.role === 'client') {
-        await addNotification({
-          userId: 'admin',
-          message: `Le client ${user.name || 'Client'} a signé le devis #${quote.id}`,
-          type: 'success',
-          read: false,
-          link: `/quotes/${quote.id}`,
-          title: 'Devis signé'
-        });
-      } else if (user.role === 'admin' && quote.clientId) {
-        await addNotification({
-          userId: quote.clientId,
-          message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
-          type: 'success',
-          read: false,
-          link: `/quotes/${quote.id}`,
-          title: 'Devis approuvé'
-        });
-      }
-    } catch (error) {
-      console.error('Erreur lors de la signature du devis:', error);
-      toast.error('Erreur lors de la signature du devis');
-    } finally {
       setSigningQuote(false);
       setShowSignDialog(false);
-    }
+    }, 1500);
   };
 
-  const handleRejectQuote = async () => {
-    if (!quote || !user?.id || !rejectionReason.trim()) {
-      toast.error('Veuillez fournir une raison pour le rejet');
+  // Handle rejecting quote
+  const handleRejectQuote = () => {
+    if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
+    
+    if (!rejectionReason.trim()) {
+      toast.error('Veuillez fournir une raison pour la réjection');
       return;
     }
     
-    try {
-      const { error } = await supabase
-        .from('quotes')
-        .update({
-          status: 'rejected',
-          updated_at: new Date().toISOString(),
-          rejected_at: new Date().toISOString()
-        })
-        .eq('id', quote.id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      setQuote({
-        ...quote,
-        status: 'rejected',
-        updatedAt: new Date().toISOString(),
-        rejectedAt: new Date().toISOString()
-      });
-      
+    const updatedQuote = mockQuoteService.updateQuoteStatus(
+      quote.id, 
+      'rejected',
+      user.id,
+      user.name
+    );
+    
+    if (updatedQuote) {
+      setQuote(updatedQuote);
       toast.success('Devis rejeté avec succès');
       
+      // Envoyer des notifications
       if (user.role === 'admin' && quote.clientId) {
-        await addNotification({
+        addNotification({
           userId: quote.clientId,
           message: `Votre devis #${quote.id} a été rejeté par l'administrateur`,
           type: 'error',
@@ -276,32 +188,34 @@ export default function QuoteDetail() {
           title: 'Devis rejeté'
         });
       } else if (user.role === 'client') {
-        await addNotification({
+        addNotification({
           userId: 'admin',
-          message: `Le client ${user.name || 'Client'} a rejeté le devis #${quote.id}`,
+          message: `Le client ${user.name} a rejeté le devis #${quote.id}`,
           type: 'error',
           read: false,
           link: `/quotes/${quote.id}`,
           title: 'Devis rejeté'
         });
       }
-    } catch (error) {
-      console.error('Erreur lors du rejet du devis:', error);
-      toast.error('Erreur lors du rejet du devis');
-    } finally {
-      setShowRejectDialog(false);
-      setRejectionReason('');
     }
+    
+    setShowRejectDialog(false);
+    setRejectionReason('');
   };
 
+  // Determine if the current user can sign/reject the quote
   const canSignReject = () => {
     if (!user || !quote) return false;
     
+    // Admin peut approuver ou rejeter les devis en attente
     if (user.role === 'admin') return quote.status === 'pending';
     
+    // Les clients ne peuvent pas signer ou rejeter les devis dans la page de détail
+    // Ils doivent utiliser les boutons dans le footer
     return false;
   };
 
+  // Get status badge classes
   const getStatusBadge = (status: Quote['status']) => {
     let bgColor = '';
     let textColor = '';
@@ -335,6 +249,7 @@ export default function QuoteDetail() {
     return `${bgColor} ${textColor} px-3 py-1 rounded-full text-sm font-medium inline-block`;
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -343,6 +258,7 @@ export default function QuoteDetail() {
     );
   }
 
+  // Check if the quote is not found or user doesn't have access
   if (!loading && (!quote || !hasAccess())) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -360,6 +276,7 @@ export default function QuoteDetail() {
     );
   }
 
+  // Déterminer le statut en français
   const getStatusLabel = (status: Quote['status']) => {
     switch (status) {
       case 'draft': return 'Brouillon';
@@ -371,33 +288,9 @@ export default function QuoteDetail() {
     }
   };
 
-  const renderActionButtons = () => {
-    if (!canSignReject() || user?.role === 'client') {
-      return null;
-    }
-    
-    return (
-      <div className="mt-8 space-y-3">
-        <Button 
-          className="w-full bg-green-600 hover:bg-green-700"
-          onClick={() => setShowSignDialog(true)}
-        >
-          <CheckCircle2 className="h-4 w-4 mr-2" /> Approuver le devis
-        </Button>
-        
-        <Button 
-          variant="destructive"
-          className="w-full"
-          onClick={() => setShowRejectDialog(true)}
-        >
-          <XCircle className="h-4 w-4 mr-2" /> Rejeter le devis
-        </Button>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
+      {/* Back button and header */}
       <div className="flex flex-col space-y-4 md:flex-row md:justify-between md:items-center mb-6">
         <div>
           <Link 
@@ -432,6 +325,7 @@ export default function QuoteDetail() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Quote info card */}
         <Card className="md:col-span-1 p-6">
           <h3 className="text-lg font-medium mb-4">Informations du devis</h3>
           <dl className="space-y-4">
@@ -470,14 +364,34 @@ export default function QuoteDetail() {
             )}
           </dl>
           
-          {renderActionButtons()}
+          {/* Sign/Reject buttons - ADMIN ONLY */}
+          {canSignReject() && (
+            <div className="mt-8 space-y-3">
+              <Button 
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={() => setShowSignDialog(true)}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" /> Approuver le devis
+              </Button>
+              
+              <Button 
+                variant="destructive"
+                className="w-full"
+                onClick={() => setShowRejectDialog(true)}
+              >
+                <XCircle className="h-4 w-4 mr-2" /> Rejeter le devis
+              </Button>
+            </div>
+          )}
         </Card>
         
+        {/* Quote details */}
         <div className="md:col-span-2">
           <Card className="p-6">
             <h3 className="text-lg font-medium mb-4">Détails du devis</h3>
             
             <div className="space-y-6">
+              {/* Quote items table */}
               <div className="overflow-x-auto border rounded-md">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -517,6 +431,7 @@ export default function QuoteDetail() {
                 </table>
               </div>
               
+              {/* Quote summary */}
               <div className="border-t pt-4">
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">Sous-total</span>
@@ -533,6 +448,7 @@ export default function QuoteDetail() {
               </div>
             </div>
             
+            {/* Quote notes */}
             <div className="mt-8">
               <h4 className="font-medium mb-2">Notes</h4>
               <div className="bg-gray-50 p-4 rounded-md text-sm">
@@ -542,6 +458,7 @@ export default function QuoteDetail() {
               </div>
             </div>
             
+            {/* Link to dossier */}
             <div className="mt-6 pt-6 border-t">
               <Link 
                 to={`/dossiers/${quote.dossierId}`}
@@ -554,6 +471,7 @@ export default function QuoteDetail() {
         </div>
       </div>
 
+      {/* Footer with bank details and action buttons */}
       <div className="mt-6">
         <QuoteFooter 
           bankDetails={bankDetails}
@@ -563,6 +481,7 @@ export default function QuoteDetail() {
         />
       </div>
 
+      {/* Sign quote dialog */}
       <Dialog open={showSignDialog} onOpenChange={setShowSignDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -617,6 +536,7 @@ export default function QuoteDetail() {
         </DialogContent>
       </Dialog>
 
+      {/* Reject quote dialog */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
