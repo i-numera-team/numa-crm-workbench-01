@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +33,12 @@ export default function Marketplace() {
     const fetchOffers = async () => {
       setIsLoading(true);
       try {
+        // Log allowed categories
+        const { data: categoryConstraint, error: constraintError } = await supabase.rpc('get_offer_category_constraint');
+        if (categoryConstraint) {
+          console.log('Allowed categories:', categoryConstraint);
+        }
+        
         const { data, error } = await supabase
           .from('offers')
           .select('*')
