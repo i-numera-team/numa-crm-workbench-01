@@ -1,9 +1,11 @@
 
+import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, Outlet } from 'react-router-dom';
 import { UserRole } from '@/types/auth';
+import { useMobile } from '@/hooks/use-mobile';
 
 interface ProtectedLayoutProps {
   allowedRoles?: UserRole[];
@@ -11,6 +13,26 @@ interface ProtectedLayoutProps {
 
 export default function Layout({ allowedRoles = ['client', 'agent', 'admin'] }: ProtectedLayoutProps) {
   const { isAuthenticated, hasAccess, isLoading } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isMobile = useMobile();
+
+  // Fermer automatiquement la sidebar sur mobile lors du changement de route
+  useEffect(() => {
+    if (isMobile && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
+  }, [window.location.pathname, isMobile]);
+
+  // Ouvrir automatiquement la sidebar sur desktop
+  useEffect(() => {
+    if (!isMobile) {
+      setIsSidebarOpen(true);
+    }
+  }, [isMobile]);
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   if (isLoading) {
     return (
@@ -31,9 +53,13 @@ export default function Layout({ allowedRoles = ['client', 'agent', 'admin'] }: 
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#181925]">
-      <Sidebar />
+      <Sidebar isOpen={isSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+        <Header 
+          isSidebarOpen={isSidebarOpen} 
+          toggleSidebar={toggleSidebar} 
+          isMobile={isMobile} 
+        />
         <main className="flex-1 overflow-auto p-4 md:p-6 bg-background text-foreground">
           <Outlet />
         </main>

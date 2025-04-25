@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 import { QuoteFooter } from '@/components/quote/QuoteFooter';
 import { useNotifications } from '@/hooks/useNotifications';
 import { supabase } from '@/integrations/supabase/client';
+import { Quote } from '@/types/quote';
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();

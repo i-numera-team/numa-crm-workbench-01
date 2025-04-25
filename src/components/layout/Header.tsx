@@ -16,6 +16,8 @@ export default function Header({ isSidebarOpen, toggleSidebar, isMobile }: {
 }) {
   const { isAuthenticated } = useAuth();
   const { cartCount } = useCart();
+  
+  const showCartBadge = cartCount > 0;
 
   return (
     <header className="bg-white dark:bg-gray-950 sticky top-0 z-30 border-b py-3 px-4">
@@ -46,7 +48,7 @@ export default function Header({ isSidebarOpen, toggleSidebar, isMobile }: {
               <circle cx="19" cy="21" r="1"/>
               <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
             </svg>
-            {cartCount > 0 && (
+            {showCartBadge && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
                 {cartCount}
               </span>
