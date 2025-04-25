@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { mockDataService, Dossier } from '@/utils/mockData';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,14 +33,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { dossierService, DossierData } from '@/services/dossierService';
 
 export default function Dossiers() {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  const [dossiers, setDossiers] = useState<DossierData[]>([]);
-  const [filteredDossiers, setFilteredDossiers] = useState<DossierData[]>([]);
+  const [dossiers, setDossiers] = useState<Dossier[]>([]);
+  const [filteredDossiers, setFilteredDossiers] = useState<Dossier[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showNewDossierDialog, setShowNewDossierDialog] = useState(false);
@@ -56,16 +56,20 @@ export default function Dossiers() {
   });
 
   useEffect(() => {
-    // Charger les dossiers depuis Supabase
-    const loadDossiers = async () => {
-      setLoading(true);
-      const dossiersData = await dossierService.getDossiers();
-      setDossiers(dossiersData);
-      setFilteredDossiers(dossiersData);
-      setLoading(false);
-    };
+    // Load dossiers based on user role
+    let loadedDossiers: Dossier[];
     
-    loadDossiers();
+    if (user?.role === 'client') {
+      // Client can only see their own dossiers
+      loadedDossiers = mockDataService.getDossiersByClientId(user.id);
+    } else {
+      // Agent and admin can see all dossiers
+      loadedDossiers = mockDataService.getDossiers();
+    }
+    
+    setDossiers(loadedDossiers);
+    setFilteredDossiers(loadedDossiers);
+    setLoading(false);
   }, [user]);
 
   // Filter dossiers when search query or status filter changes
@@ -75,8 +79,8 @@ export default function Dossiers() {
     // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(dossier => 
-        dossier.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dossier.company?.toLowerCase().includes(searchQuery.toLowerCase())
+        dossier.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        dossier.company.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
@@ -89,68 +93,56 @@ export default function Dossiers() {
   }, [dossiers, searchQuery, statusFilter]);
 
   // Handle creating a new dossier (Agent/Admin only)
-  const handleCreateDossier = async () => {
+  const handleCreateDossier = () => {
     if (!user || (user.role !== 'agent' && user.role !== 'admin')) {
-      toast.error('Seuls les agents et les administrateurs peuvent créer des dossiers');
+      toast.error('Only agents and administrators can create dossiers');
       return;
     }
     
     if (!newDossier.clientName || !newDossier.clientEmail || !newDossier.company) {
-      toast.error('Veuillez remplir tous les champs requis');
-      return;
-    }
-    
-    // TODO: Pour l'instant, nous devons récupérer l'ID client d'après l'email
-    // Dans un système réel, on aurait un sélecteur de client
-    const { data: clientData } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', newDossier.clientEmail)
-      .single();
-      
-    if (!clientData) {
-      toast.error('Client introuvable avec cet email');
+      toast.error('Please fill all required fields');
       return;
     }
     
     // Create a new dossier
-    const createdDossier = await dossierService.createDossier({
-      clientId: clientData.id,
+    const createdDossier = mockDataService.createDossier({
+      clientId: '0', // This would be a real client ID in a real app
+      clientName: newDossier.clientName,
+      clientEmail: newDossier.clientEmail,
+      company: newDossier.company,
+      status: 'new',
       agentId: user.id,
+      agentName: user.name
+    });
+    
+    // Add the new dossier to the list
+    setDossiers([createdDossier, ...dossiers]);
+    setShowNewDossierDialog(false);
+    toast.success('Dossier created successfully');
+    
+    // Reset form
+    setNewDossier({
+      clientName: '',
+      clientEmail: '',
+      company: '',
       status: 'new'
     });
     
-    if (createdDossier) {
-      // Reload dossiers list
-      const updatedDossiers = await dossierService.getDossiers();
-      setDossiers(updatedDossiers);
-      
-      setShowNewDossierDialog(false);
-      toast.success('Dossier créé avec succès');
-      
-      // Reset form
-      setNewDossier({
-        clientName: '',
-        clientEmail: '',
-        company: '',
-        status: 'new'
-      });
-      
-      // Navigate to new dossier
-      navigate(`/dossiers/${createdDossier.id}`);
-    }
+    // Navigate to new dossier
+    navigate(`/dossiers/${createdDossier.id}`);
   };
 
   // Handle deleting a dossier (Admin only)
-  const handleDeleteDossier = async () => {
+  const handleDeleteDossier = () => {
     if (!dossierToDelete || user?.role !== 'admin') return;
     
-    const success = await dossierService.deleteDossier(dossierToDelete);
+    const success = mockDataService.deleteDossier(dossierToDelete);
     
     if (success) {
-      // Remove deleted dossier from state
       setDossiers(dossiers.filter(d => d.id !== dossierToDelete));
-      toast.success('Dossier supprimé avec succès');
+      toast.success('Dossier deleted successfully');
+    } else {
+      toast.error('Failed to delete dossier');
     }
     
     setShowDeleteDialog(false);
@@ -160,7 +152,7 @@ export default function Dossiers() {
   // Show delete confirmation dialog
   const confirmDelete = (dossierId: string) => {
     if (user?.role !== 'admin') {
-      toast.error('Seuls les administrateurs peuvent supprimer des dossiers');
+      toast.error('Only administrators can delete dossiers');
       return;
     }
     
@@ -169,7 +161,7 @@ export default function Dossiers() {
   };
 
   // Get status badge classes
-  const getStatusBadge = (status: DossierData['status']) => {
+  const getStatusBadge = (status: Dossier['status']) => {
     let bgColor = '';
     let textColor = '';
     
@@ -203,7 +195,6 @@ export default function Dossiers() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  // ... Le reste du code reste inchangé
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -211,8 +202,8 @@ export default function Dossiers() {
           <h1 className="text-2xl font-bold tracking-tight">Dossiers</h1>
           <p className="text-muted-foreground">
             {user?.role === 'client' 
-              ? 'Consultez et gérez vos dossiers' 
-              : 'Consultez et gérez les dossiers clients'}
+              ? 'View and manage your dossiers' 
+              : 'View and manage client dossiers'}
           </p>
         </div>
         
@@ -222,7 +213,7 @@ export default function Dossiers() {
             onClick={() => setShowNewDossierDialog(true)}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Nouveau Dossier
+            New Dossier
           </Button>
         )}
       </div>
@@ -233,7 +224,7 @@ export default function Dossiers() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Rechercher des dossiers..."
+              placeholder="Search dossiers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -242,14 +233,14 @@ export default function Dossiers() {
           <div className="w-full sm:w-44">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Filtrer par statut" />
+                <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="new">Nouveau</SelectItem>
-                <SelectItem value="in-progress">En cours</SelectItem>
-                <SelectItem value="completed">Terminé</SelectItem>
-                <SelectItem value="cancelled">Annulé</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="in-progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -267,11 +258,11 @@ export default function Dossiers() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID du dossier</TableHead>
+                  <TableHead>Dossier ID</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead>Entreprise</TableHead>
-                  <TableHead>Créé le</TableHead>
-                  <TableHead>Statut</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Created On</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -294,7 +285,7 @@ export default function Dossiers() {
                           variant="outline"
                           onClick={() => navigate(`/dossiers/${dossier.id}`)}
                         >
-                          <Eye className="h-4 w-4 mr-1" /> Voir
+                          <Eye className="h-4 w-4 mr-1" /> View
                         </Button>
                         
                         {user?.role === 'admin' && (
@@ -318,13 +309,13 @@ export default function Dossiers() {
             <div className="rounded-full bg-gray-100 p-6 mb-4">
               <FolderOpen className="h-12 w-12 text-gray-400" />
             </div>
-            <h3 className="text-xl font-medium">Aucun dossier trouvé</h3>
+            <h3 className="text-xl font-medium">No dossiers found</h3>
             <p className="text-gray-500 mt-2">
               {searchQuery || statusFilter !== 'all'
-                ? 'Essayez d\'ajuster votre recherche ou vos filtres'
+                ? 'Try adjusting your search or filters'
                 : user?.role === 'client' 
-                ? 'Vous n\'avez pas encore de dossiers'
-                : 'Créez un nouveau dossier pour commencer'}
+                ? 'You do not have any dossiers yet'
+                : 'Create a new dossier to get started'}
             </p>
           </div>
         )}
@@ -334,50 +325,50 @@ export default function Dossiers() {
       <Dialog open={showNewDossierDialog} onOpenChange={setShowNewDossierDialog}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Créer un nouveau dossier</DialogTitle>
+            <DialogTitle>Create New Dossier</DialogTitle>
             <DialogDescription>
-              Entrez les informations du client pour créer un nouveau dossier
+              Enter the client information to create a new dossier
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="clientName">Nom du client</Label>
+                <Label htmlFor="clientName">Client Name</Label>
                 <Input
                   id="clientName"
                   value={newDossier.clientName}
                   onChange={(e) => setNewDossier({ ...newDossier, clientName: e.target.value })}
-                  placeholder="Entrez le nom du client"
+                  placeholder="Enter client name"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="clientEmail">Email du client</Label>
+                <Label htmlFor="clientEmail">Client Email</Label>
                 <Input
                   id="clientEmail"
                   type="email"
                   value={newDossier.clientEmail}
                   onChange={(e) => setNewDossier({ ...newDossier, clientEmail: e.target.value })}
-                  placeholder="client@exemple.com"
+                  placeholder="client@example.com"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="company">Nom de l'entreprise</Label>
+                <Label htmlFor="company">Company Name</Label>
                 <Input
                   id="company"
                   value={newDossier.company}
                   onChange={(e) => setNewDossier({ ...newDossier, company: e.target.value })}
-                  placeholder="Entrez le nom de l'entreprise"
+                  placeholder="Enter company name"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes initiales (Optionnel)</Label>
+                <Label htmlFor="notes">Initial Notes (Optional)</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Toute note initiale ou information sur ce client"
+                  placeholder="Any initial notes or information about this client"
                   rows={4}
                 />
               </div>
@@ -386,10 +377,10 @@ export default function Dossiers() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewDossierDialog(false)}>
-              Annuler
+              Cancel
             </Button>
             <Button className="bg-numa-500 hover:bg-numa-600" onClick={handleCreateDossier}>
-              Créer le dossier
+              Create Dossier
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -401,19 +392,19 @@ export default function Dossiers() {
           <DialogHeader>
             <div className="flex items-center gap-2 text-red-600">
               <AlertCircle className="h-5 w-5" />
-              <DialogTitle>Confirmer la suppression</DialogTitle>
+              <DialogTitle>Confirm Deletion</DialogTitle>
             </div>
             <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer ce dossier ? Cette action ne peut pas être annulée.
+              Are you sure you want to delete this dossier? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Annuler
+              Cancel
             </Button>
             <Button variant="destructive" onClick={handleDeleteDossier}>
-              Supprimer le dossier
+              Delete Dossier
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -18,43 +18,11 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { QuoteFooter } from '@/components/quote/QuoteFooter';
 import { useNotifications } from '@/hooks/useNotifications';
-import { supabase } from '@/integrations/supabase/client';
-
-// Type définition pour un devis de Supabase
-interface SupabaseQuote {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  dossier_id: string;
-  total_price: number;
-  status: string;
-  bank_name: string | null;
-  iban: string | null;
-  bic: string | null;
-  description: string | null;
-  signedAt?: string; // Pour compatibilité avec les données mockées
-  rejectedAt?: string; // Pour compatibilité avec les données mockées
-  quote_items: {
-    id: string;
-    quote_id: string;
-    offer_id: string;
-    price: number;
-    quantity: number;
-    created_at: string;
-    offer?: {
-      name: string;
-      description: string | null;
-    } | null;
-  }[];
-  dossiers?: any;
-  clientName?: string;
-  agentName?: string;
-}
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const [quote, setQuote] = useState<Quote | SupabaseQuote | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSignDialog, setShowSignDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -66,79 +34,24 @@ export default function QuoteDetail() {
     iban: '',
     bic: ''
   });
-  const [isUsingSupabase, setIsUsingSupabase] = useState(false);
 
   useEffect(() => {
     if (!id) return;
 
-    const loadQuote = async () => {
-      setLoading(true);
+    // Load quote details
+    const loadedQuote = mockQuoteService.getQuoteById(id);
+    setQuote(loadedQuote || null);
 
-      try {
-        // Essayer d'abord de charger depuis Supabase
-        const { data: supabaseQuote, error } = await supabase
-          .from('quotes')
-          .select(`
-            *,
-            quote_items (
-              *,
-              offer:offer_id (name, description)
-            ),
-            dossiers:dossier_id (
-              *,
-              client:client_id (name, email, company),
-              agent:agent_id (name)
-            )
-          `)
-          .eq('id', id)
-          .single();
+    // Extract bank details if available
+    if (loadedQuote) {
+      setBankDetails({
+        bankName: loadedQuote.bankName || '',
+        iban: loadedQuote.iban || '',
+        bic: loadedQuote.bic || ''
+      });
+    }
 
-        if (!error && supabaseQuote) {
-          // Si le chargement depuis Supabase réussit
-          setQuote({
-            ...supabaseQuote,
-            clientName: supabaseQuote.dossiers?.client?.name || 'Client inconnu',
-            agentName: supabaseQuote.dossiers?.agent?.name || 'Agent inconnu',
-            signedAt: supabaseQuote.status === 'signed' ? supabaseQuote.updated_at : undefined,
-            rejectedAt: supabaseQuote.status === 'rejected' ? supabaseQuote.updated_at : undefined
-          });
-          setIsUsingSupabase(true);
-
-          // Extraire les détails bancaires
-          setBankDetails({
-            bankName: supabaseQuote.bank_name || '',
-            iban: supabaseQuote.iban || '',
-            bic: supabaseQuote.bic || ''
-          });
-        } else {
-          // Fallback aux données mockées
-          const loadedQuote = mockQuoteService.getQuoteById(id);
-          setQuote(loadedQuote || null);
-          setIsUsingSupabase(false);
-
-          // Extraire les détails bancaires
-          if (loadedQuote) {
-            setBankDetails({
-              bankName: loadedQuote.bankName || '',
-              iban: loadedQuote.iban || '',
-              bic: loadedQuote.bic || ''
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement du devis:', error);
-        toast.error('Erreur lors du chargement du devis');
-        
-        // Fallback aux données mockées
-        const loadedQuote = mockQuoteService.getQuoteById(id);
-        setQuote(loadedQuote || null);
-        setIsUsingSupabase(false);
-      }
-
-      setLoading(false);
-    };
-
-    loadQuote();
+    setLoading(false);
   }, [id]);
 
   // Check if user has access to this quote
@@ -197,36 +110,25 @@ export default function QuoteDetail() {
   };
 
   // Handle signing quote
-  const handleSignQuote = async () => {
+  const handleSignQuote = () => {
     if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
     
     setSigningQuote(true);
     
-    try {
-      if (isUsingSupabase) {
-        // Mettre à jour le devis dans Supabase
-        const { error } = await supabase
-          .from('quotes')
-          .update({
-            status: 'signed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', quote.id);
-
-        if (error) throw error;
+    // Simulate signing delay
+    setTimeout(() => {
+      const updatedQuote = mockQuoteService.updateQuoteStatus(
+        quote.id, 
+        'signed',
+        user.id,
+        user.name
+      );
+      
+      if (updatedQuote) {
+        setQuote(updatedQuote);
+        toast.success('Devis signé avec succès');
         
-        // Mettre à jour l'état local
-        setQuote(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            status: 'signed',
-            signedAt: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-        });
-        
-        // Ajouter une notification
+        // Envoyer une notification à l'administrateur si c'est un client qui signe
         if (user.role === 'client') {
           addNotification({
             userId: 'admin',
@@ -236,69 +138,27 @@ export default function QuoteDetail() {
             link: `/quotes/${quote.id}`,
             title: 'Devis signé'
           });
-        } else if (user.role === 'admin') {
-          const dossier = (quote as SupabaseQuote).dossiers;
-          if (dossier && dossier.client_id) {
-            addNotification({
-              userId: dossier.client_id,
-              message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
-              type: 'success',
-              read: false,
-              link: `/quotes/${quote.id}`,
-              title: 'Devis approuvé'
-            });
-          }
         }
-        
-        toast.success('Devis signé avec succès');
-      } else {
-        // Utiliser le service mockée
-        const updatedQuote = mockQuoteService.updateQuoteStatus(
-          quote.id, 
-          'signed',
-          user.id,
-          user.name
-        );
-        
-        if (updatedQuote) {
-          setQuote(updatedQuote);
-          toast.success('Devis signé avec succès');
-          
-          // Envoyer une notification à l'administrateur si c'est un client qui signe
-          if (user.role === 'client') {
-            addNotification({
-              userId: 'admin',
-              message: `Le client ${user.name} a signé le devis #${quote.id}`,
-              type: 'success',
-              read: false,
-              link: `/quotes/${quote.id}`,
-              title: 'Devis signé'
-            });
-          }
-          // Envoyer une notification au client si c'est l'admin qui signe
-          else if (user.role === 'admin' && (quote as Quote).clientId) {
-            addNotification({
-              userId: (quote as Quote).clientId,
-              message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
-              type: 'success',
-              read: false,
-              link: `/quotes/${quote.id}`,
-              title: 'Devis approuvé'
-            });
-          }
+        // Envoyer une notification au client si c'est l'admin qui signe
+        else if (user.role === 'admin' && quote.clientId) {
+          addNotification({
+            userId: quote.clientId,
+            message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${quote.id}`,
+            title: 'Devis approuvé'
+          });
         }
       }
-    } catch (error) {
-      console.error('Erreur lors de la signature du devis:', error);
-      toast.error('Erreur lors de la signature du devis');
-    } finally {
+      
       setSigningQuote(false);
       setShowSignDialog(false);
-    }
+    }, 1500);
   };
 
   // Handle rejecting quote
-  const handleRejectQuote = async () => {
+  const handleRejectQuote = () => {
     if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
     
     if (!rejectionReason.trim()) {
@@ -306,148 +166,128 @@ export default function QuoteDetail() {
       return;
     }
     
-    try {
-      if (isUsingSupabase) {
-        // Mettre à jour le devis dans Supabase
-        const { error } = await supabase
-          .from('quotes')
-          .update({
-            status: 'rejected',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', quote.id);
-
-        if (error) throw error;
-        
-        // Mettre à jour l'état local
-        setQuote(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            status: 'rejected',
-            rejectedAt: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
+    const updatedQuote = mockQuoteService.updateQuoteStatus(
+      quote.id, 
+      'rejected',
+      user.id,
+      user.name
+    );
+    
+    if (updatedQuote) {
+      setQuote(updatedQuote);
+      toast.success('Devis rejeté avec succès');
+      
+      // Envoyer des notifications
+      if (user.role === 'admin' && quote.clientId) {
+        addNotification({
+          userId: quote.clientId,
+          message: `Votre devis #${quote.id} a été rejeté par l'administrateur`,
+          type: 'error',
+          read: false,
+          link: `/quotes/${quote.id}`,
+          title: 'Devis rejeté'
         });
-        
-        // Ajouter des notifications
-        if (user.role === 'admin' && (quote as SupabaseQuote).dossiers?.client_id) {
-          addNotification({
-            userId: (quote as SupabaseQuote).dossiers.client_id,
-            message: `Votre devis #${quote.id} a été rejeté par l'administrateur`,
-            type: 'error',
-            read: false,
-            link: `/quotes/${quote.id}`,
-            title: 'Devis rejeté'
-          });
-        } else if (user.role === 'client') {
-          addNotification({
-            userId: 'admin',
-            message: `Le client ${user.name} a rejeté le devis #${quote.id}`,
-            type: 'error',
-            read: false,
-            link: `/quotes/${quote.id}`,
-            title: 'Devis rejeté'
-          });
-        }
-        
-        toast.success('Devis rejeté avec succès');
-      } else {
-        // Utiliser le service mocké
-        const updatedQuote = mockQuoteService.updateQuoteStatus(
-          quote.id, 
-          'rejected',
-          user.id,
-          user.name
-        );
-        
-        if (updatedQuote) {
-          setQuote(updatedQuote);
-          toast.success('Devis rejeté avec succès');
-          
-          // Envoyer des notifications
-          if (user.role === 'admin' && (quote as Quote).clientId) {
-            addNotification({
-              userId: (quote as Quote).clientId,
-              message: `Votre devis #${quote.id} a été rejeté par l'administrateur`,
-              type: 'error',
-              read: false,
-              link: `/quotes/${quote.id}`,
-              title: 'Devis rejeté'
-            });
-          } else if (user.role === 'client') {
-            addNotification({
-              userId: 'admin',
-              message: `Le client ${user.name} a rejeté le devis #${quote.id}`,
-              type: 'error',
-              read: false,
-              link: `/quotes/${quote.id}`,
-              title: 'Devis rejeté'
-            });
-          }
-        }
+      } else if (user.role === 'client') {
+        addNotification({
+          userId: 'admin',
+          message: `Le client ${user.name} a rejeté le devis #${quote.id}`,
+          type: 'error',
+          read: false,
+          link: `/quotes/${quote.id}`,
+          title: 'Devis rejeté'
+        });
       }
-    } catch (error) {
-      console.error('Erreur lors du rejet du devis:', error);
-      toast.error('Erreur lors du rejet du devis');
-    } finally {
-      setShowRejectDialog(false);
-      setRejectionReason('');
     }
-  };
-
-  // Helper pour accéder aux propriétés du devis de manière unifiée
-  const getQuoteProperty = (propertyName: string) => {
-    if (!quote) return null;
     
-    // Les propriétés peuvent être en camelCase ou avec des underscores selon la source
-    const camelCaseProp = propertyName;
-    const underscoreProp = propertyName.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-    
-    return (quote as any)[camelCaseProp] !== undefined 
-      ? (quote as any)[camelCaseProp] 
-      : (quote as any)[underscoreProp];
+    setShowRejectDialog(false);
+    setRejectionReason('');
   };
 
   // Determine if the current user can sign/reject the quote
   const canSignReject = () => {
     if (!user || !quote) return false;
     
-    const status = getQuoteProperty('status');
-    
     // Admin peut approuver ou rejeter les devis en attente
-    if (user.role === 'admin') return status === 'pending';
+    if (user.role === 'admin') return quote.status === 'pending';
     
     // Les clients ne peuvent pas signer ou rejeter les devis dans la page de détail
+    // Ils doivent utiliser les boutons dans le footer
     return false;
   };
 
-  // Pour adapter le rendu des éléments du devis
-  const getQuoteItems = () => {
-    if (!quote) return [];
+  // Get status badge classes
+  const getStatusBadge = (status: Quote['status']) => {
+    let bgColor = '';
+    let textColor = '';
     
-    if (isUsingSupabase && (quote as SupabaseQuote).quote_items) {
-      return (quote as SupabaseQuote).quote_items.map(item => ({
-        offre: item.offer?.name || 'Article sans nom',
-        description: item.offer?.description || 'Aucune description',
-        prix: item.price,
-        quantite: item.quantity,
-        montant: item.price * item.quantity
-      }));
-    } else if ((quote as Quote).items) {
-      return (quote as Quote).items.map(item => ({
-        offre: item.offerTitle,
-        description: item.offerTitle, // Pas de description dans les données mockées
-        prix: item.price,
-        quantite: item.quantity,
-        montant: item.price * item.quantity
-      }));
+    switch (status) {
+      case 'draft':
+        bgColor = 'bg-gray-100';
+        textColor = 'text-gray-800';
+        break;
+      case 'pending':
+        bgColor = 'bg-orange-100';
+        textColor = 'text-orange-800';
+        break;
+      case 'approved':
+        bgColor = 'bg-blue-100';
+        textColor = 'text-blue-800';
+        break;
+      case 'signed':
+        bgColor = 'bg-green-100';
+        textColor = 'text-green-800';
+        break;
+      case 'rejected':
+        bgColor = 'bg-red-100';
+        textColor = 'text-red-800';
+        break;
+      default:
+        bgColor = 'bg-gray-100';
+        textColor = 'text-gray-800';
     }
     
-    return [];
+    return `${bgColor} ${textColor} px-3 py-1 rounded-full text-sm font-medium inline-block`;
   };
 
-  // ... Gardez le reste du code inchangé
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-numa-500"></div>
+      </div>
+    );
+  }
+
+  // Check if the quote is not found or user doesn't have access
+  if (!loading && (!quote || !hasAccess())) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <h2 className="text-2xl font-bold mb-4">Devis introuvable</h2>
+        <p className="text-gray-500 mb-8">
+          Le devis que vous recherchez n'existe pas ou vous n'avez pas la permission d'y accéder.
+        </p>
+        <Button asChild variant="outline">
+          <Link to="/quotes">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Retour aux devis
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  // Déterminer le statut en français
+  const getStatusLabel = (status: Quote['status']) => {
+    switch (status) {
+      case 'draft': return 'Brouillon';
+      case 'pending': return 'En attente';
+      case 'approved': return 'Approuvé';
+      case 'signed': return 'Signé';
+      case 'rejected': return 'Rejeté';
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Back button and header */}
