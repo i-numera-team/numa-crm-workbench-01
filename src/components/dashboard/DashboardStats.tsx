@@ -1,22 +1,23 @@
+
 import { Card } from "@/components/ui/card";
-import { Bar, XAxis, YAxis, CartesianGrid, ComposedChart } from 'recharts';
 import { UserRole } from "@/types/auth";
-import { mockDataService } from "@/utils/mockData";
-import { useState, useEffect } from "react";
 import { File, FileCheck, FileX, FolderOpen } from "lucide-react";
-import { ChartContainer, ChartLegendContent, ChartTooltipContent } from '@/components/ui/chart';
 import { StatCard } from "./StatCard";
 import { RevenueChart } from "./RevenueChart";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 
 export function DashboardStats({ role }: { role: UserRole }) {
-  const stats = mockDataService.getStats();
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  const { stats, isLoading } = useDashboardStats(role);
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 640);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="p-6 h-32 animate-pulse bg-muted" />
+        ))}
+      </div>
+    );
+  }
 
   if (role === 'client') {
     return (
@@ -24,21 +25,21 @@ export function DashboardStats({ role }: { role: UserRole }) {
         <StatCard 
           icon={<FolderOpen className="h-6 w-6 text-blue-500" />}
           title="Dossiers actifs"
-          value={1}
+          value={stats.activeDossiers}
           description="Dossiers en cours"
           color="blue"
         />
         <StatCard 
           icon={<FileCheck className="h-6 w-6 text-green-500" />}
           title="Devis signés"
-          value={1}
+          value={stats.approvedQuotes}
           description="Devis validés"
           color="green"
         />
         <StatCard 
           icon={<File className="h-6 w-6 text-orange-500" />}
           title="Devis en attente"
-          value={1}
+          value={stats.pendingQuotes}
           description="En attente de signature"
           color="orange"
         />
