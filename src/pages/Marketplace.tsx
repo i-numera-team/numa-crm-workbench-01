@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,7 @@ export default function Marketplace() {
       setIsLoading(true);
       try {
         // Log allowed categories
-        const { data: categoryConstraint, error: constraintError } = await supabase.rpc('get_offer_category_constraint');
+        const { data: categoryConstraint } = await supabase.functions.invoke('get-offer-category-constraint');
         if (categoryConstraint) {
           console.log('Allowed categories:', categoryConstraint);
         }
@@ -95,9 +96,15 @@ export default function Marketplace() {
       'site_internet': 'Sites Web',
       'referencement': 'Référencement',
       'community_management': 'Community Management',
-      'solutions_metiers': 'Solutions Métiers'
+      'solutions_metiers': 'Solutions Métiers',
+      'prospection_digitale': 'Prospection Digitale'
     };
     return categoryMap[category] || category;
+  };
+
+  // Format price display
+  const formatPrice = (price: number) => {
+    return price === 0 ? "Sur devis" : `${price}€/mois`;
   };
   
   return (
@@ -143,16 +150,23 @@ export default function Marketplace() {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Abonnement mensuel</span>
-                        <span className="font-bold">{offer.price_monthly}€/mois</span>
+                        <span className="font-bold">{formatPrice(offer.price_monthly)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Frais d'installation</span>
-                        <span>{offer.setup_fee}€</span>
+                        <span>{offer.setup_fee === 0 ? "Gratuit" : `${offer.setup_fee}€`}</span>
                       </div>
                     </div>
                   </CardContent>
                   <CardFooter className="pt-2">
-                    {isInCart(offer.id) ? (
+                    {offer.price_monthly === 0 ? (
+                      <Button 
+                        className="w-full bg-numa-500 hover:bg-numa-600"
+                        onClick={() => window.location.href = 'mailto:contact@example.com?subject=Demande de devis - ' + offer.name}
+                      >
+                        Demander un devis
+                      </Button>
+                    ) : isInCart(offer.id) ? (
                       <Button 
                         variant="outline" 
                         className="w-full gap-2"
