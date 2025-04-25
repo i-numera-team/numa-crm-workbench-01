@@ -65,7 +65,7 @@ export function NotificationsMenu() {
                     className={`w-full p-3 flex flex-col ${!notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
-                    <div className="flex items-start justify-between w-full">
+                    <div className="flex  justify-between w-full">
                       <div className="flex-1">
                         <p className={`text-sm ${!notification.read ? 'font-medium' : ''}`}>{notification.message}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
