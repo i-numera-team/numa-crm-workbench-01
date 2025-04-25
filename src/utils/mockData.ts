@@ -1,4 +1,9 @@
 
+import { mockCartService } from '@/services/mockCartService';
+import { mockDossierService } from '@/services/mockDossierService';
+import { mockQuoteService } from '@/services/mockQuoteService';
+import { mockAnalyticsService } from '@/services/mockAnalyticsService';
+
 export * from '@/types/mock';
 export { mockCartService } from '@/services/mockCartService';
 export { mockDossierService } from '@/services/mockDossierService';
@@ -18,7 +23,11 @@ export const mockDataService = {
   // Dossier methods
   getDossierById: (id: string) => mockDossierService.getDossierById(id),
   getDossiers: () => mockDossierService.getDossiers(),
+  getDossiersByClientId: (clientId: string) => mockDossierService.getDossiersByClientId(clientId),
   createDossier: (dossierData: any) => mockDossierService.createDossier(dossierData),
+  updateDossier: (id: string, updates: any) => mockDossierService.updateDossier(id, updates),
+  deleteDossier: (id: string) => mockDossierService.deleteDossier(id),
+  addComment: (dossierId: string, comment: any) => mockDossierService.addComment(dossierId, comment),
   
   // Cart methods - for compatibility
   getCart: (userId: string) => mockCartService.getCart(userId),
@@ -30,5 +39,6 @@ export const mockDataService = {
   // Analytics methods
   getActivities: (limit: number) => mockAnalyticsService.getActivities(limit),
   getStats: () => mockAnalyticsService.getStats(),
-  getMonthlyRevenue: () => mockAnalyticsService.getMonthlyRevenue()
+  getMonthlyRevenue: () => mockAnalyticsService.getMonthlyRevenue(),
+  getQuotesByDossierId: (dossierId: string) => mockQuoteService.getQuotesByDossierId(dossierId),
 };
