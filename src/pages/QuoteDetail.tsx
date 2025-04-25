@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { quoteService } from '@/services/quoteService';
-import { SupabaseQuote, SupabaseQuoteItem } from '@/types/supabase';
-import { Quote, CartItem } from '@/types/mock';
+import { SupabaseQuoteItem } from '@/types/supabase';
+import { CartItem } from '@/types/mock';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,11 +19,12 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { QuoteFooter } from '@/components/quote/QuoteFooter';
 import { useNotifications } from '@/hooks/useNotifications';
+import { QuoteWithRelations } from '@/types/supabase';
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const [quote, setQuote] = useState<SupabaseQuote | null>(null);
+  const [quote, setQuote] = useState<QuoteWithRelations | null>(null);
   const [quoteItems, setQuoteItems] = useState<SupabaseQuoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSignDialog, setShowSignDialog] = useState(false);
@@ -77,7 +77,7 @@ export default function QuoteDetail() {
     if (user.role === 'agent') return true; // Agent can access all
     
     // Client can only access their own quotes
-    return user.role === 'client' && quote.client_id === user.id;
+    return user.role === 'client' && quote.dossier?.client_id === user.id;
   };
 
   // Format date for display
@@ -134,9 +134,7 @@ export default function QuoteDetail() {
       // Update quote status in Supabase
       const updatedQuote = await quoteService.updateQuoteStatus(
         quote.id, 
-        'signed' as 'draft' | 'pending' | 'approved' | 'signed' | 'rejected',
-        user.id,
-        user.name
+        'signed' as 'draft' | 'pending' | 'approved' | 'signed' | 'rejected'
       );
       
       setQuote(updatedQuote);
@@ -154,9 +152,9 @@ export default function QuoteDetail() {
         });
       }
       // Envoyer une notification au client si c'est l'admin qui signe
-      else if (user.role === 'admin' && quote.client_id) {
+      else if (user.role === 'admin' && quote.dossier?.client_id) {
         addNotification({
-          userId: quote.client_id,
+          userId: quote.dossier.client_id,
           message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
           type: 'success',
           read: false,
@@ -185,18 +183,16 @@ export default function QuoteDetail() {
     try {
       const updatedQuote = await quoteService.updateQuoteStatus(
         quote.id, 
-        'rejected' as 'draft' | 'pending' | 'approved' | 'signed' | 'rejected',
-        user.id,
-        user.name
+        'rejected' as 'draft' | 'pending' | 'approved' | 'signed' | 'rejected'
       );
       
       setQuote(updatedQuote);
       toast.success('Devis rejeté avec succès');
       
       // Envoyer des notifications
-      if (user.role === 'admin' && quote.client_id) {
+      if (user.role === 'admin' && quote.dossier?.client_id) {
         addNotification({
-          userId: quote.client_id,
+          userId: quote.dossier.client_id,
           message: `Votre devis #${quote.id} a été rejeté par l'administrateur`,
           type: 'error',
           read: false,
@@ -358,12 +354,12 @@ export default function QuoteDetail() {
           <dl className="space-y-4">
             <div>
               <dt className="text-sm font-medium text-gray-500">Client</dt>
-              <dd className="mt-1">{quote.client_name || 'N/A'}</dd>
+              <dd className="mt-1">{quote.dossier?.profiles?.email || 'N/A'}</dd>
             </div>
             
             <div>
               <dt className="text-sm font-medium text-gray-500">Créé par</dt>
-              <dd className="mt-1">{quote.agent_name || 'N/A'}</dd>
+              <dd className="mt-1">{quote.dossier?.agent?.email || 'N/A'}</dd>
             </div>
             
             <div>

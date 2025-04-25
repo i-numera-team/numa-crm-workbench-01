@@ -1,4 +1,3 @@
-
 export interface SupabaseQuote {
   id: string;
   dossier_id: string;
@@ -43,5 +42,19 @@ export interface SupabaseDossier {
   };
   agent?: {
     email: string;
+  };
+}
+
+export interface QuoteWithRelations extends SupabaseQuote {
+  dossier: {
+    client_id: string;
+    agent_id: string | null;
+    profiles?: {
+      email: string;
+      company: string | null;
+    };
+    agent?: {
+      email: string;
+    };
   };
 }
