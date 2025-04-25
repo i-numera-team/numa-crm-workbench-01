@@ -67,6 +67,8 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
   };
 
   const handleBankDetailsSubmit = async (bankDetails: BankDetails) => {
+    console.log("user", user);
+    
     if (!user || !user.id) {
       toast.error('Vous devez être connecté pour continuer');
       return;
