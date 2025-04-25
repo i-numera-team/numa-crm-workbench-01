@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { Bar, XAxis, YAxis, CartesianGrid, ComposedChart } from 'recharts';
 import { UserRole } from "@/types/auth";
@@ -7,6 +6,7 @@ import { useState, useEffect } from "react";
 import { File, FileCheck, FileX, FolderOpen } from "lucide-react";
 import { ChartContainer, ChartLegendContent, ChartTooltipContent } from '@/components/ui/chart';
 import { StatCard } from "./StatCard";
+import { RevenueChart } from "./RevenueChart";
 
 export function DashboardStats({ role }: { role: UserRole }) {
   const stats = mockDataService.getStats();
@@ -77,7 +77,6 @@ export function DashboardStats({ role }: { role: UserRole }) {
           description="En attente de validation"
           color="orange"
         />
-        {/* Chart amélioré */}
         <div className="col-span-1 sm:col-span-2 lg:col-span-4">
           <Card className="p-6">
             <h3 className="text-lg font-medium mb-4">Revenu mensuel</h3>
@@ -90,7 +89,6 @@ export function DashboardStats({ role }: { role: UserRole }) {
     );
   }
 
-  // Admin view
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard 

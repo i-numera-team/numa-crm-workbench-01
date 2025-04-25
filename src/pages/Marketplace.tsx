@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,16 +34,15 @@ export default function Marketplace() {
     const fetchOffers = async () => {
       setIsLoading(true);
       try {
-        // Récupérer les contraintes de catégorie
+        console.log('Fetching category constraints...');
         const { data: categoryConstraint } = await supabase.functions.invoke('get-offer-category-constraint');
-        if (categoryConstraint) {
-          console.log('Category constraints:', categoryConstraint);
-        }
+        console.log('Category constraints:', categoryConstraint);
         
         const { data, error } = await supabase
           .from('offers')
           .select('*')
-          .eq('is_active', true);
+          .eq('is_active', true)
+          .order('price_monthly');
           
         if (error) {
           console.error('Error fetching offers:', error);
@@ -53,10 +51,12 @@ export default function Marketplace() {
         }
         
         if (data) {
+          console.log('Fetched offers:', data);
           setOffers(data);
           
           // Extraire les catégories uniques
           const uniqueCategories = Array.from(new Set(data.map(offer => offer.category)));
+          console.log('Unique categories:', uniqueCategories);
           setCategories(uniqueCategories);
         }
       } catch (error) {
@@ -79,7 +79,6 @@ export default function Marketplace() {
   };
   
   const handleAddToCart = (offer: Offer) => {
-    // Créer un CartItem à partir de l'Offer
     const cartItem: CartItem = {
       offerId: offer.id,
       offerTitle: offer.name,
@@ -95,7 +94,6 @@ export default function Marketplace() {
     toast.info("Offre retirée du panier");
   };
   
-  // Convertir la catégorie en nom d'affichage
   const getCategoryDisplayName = (category: string) => {
     const categoryMap: Record<string, string> = {
       'site_internet': 'Sites Web',
@@ -107,7 +105,6 @@ export default function Marketplace() {
     return categoryMap[category] || category;
   };
 
-  // Format price display
   const formatPrice = (price: number) => {
     return price === 0 ? "Sur devis" : `${price}€/mois`;
   };
