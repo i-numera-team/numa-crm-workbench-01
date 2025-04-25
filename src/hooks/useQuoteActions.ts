@@ -6,12 +6,14 @@ import { mockQuoteService } from '@/utils/mockData';
 import { toast } from 'sonner';
 import { BankDetails } from '@/components/BankDetailsForm';
 import { profileService } from '@/services';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart: () => void) {
   const [processingQuote, setProcessingQuote] = useState(false);
   const [creatingQuote, setCreatingQuote] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
 
   const handleViewQuote = () => {
     navigate('/quote');
@@ -22,7 +24,7 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
     
     setTimeout(() => {
       if (isAgentView && !selectedClient) {
-        toast.error('Please select a client');
+        toast.error('Veuillez sélectionner un client');
         setProcessingQuote(false);
         return;
       }
@@ -33,7 +35,7 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
         : { name: user?.name, company: user?.company };
         
       if (!clientId || !clientInfo) {
-        toast.error('Client information not found');
+        toast.error('Informations client introuvables');
         setProcessingQuote(false);
         return;
       }
@@ -47,10 +49,10 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       
       const dossierId = '1';
       
-      mockQuoteService.createQuote({
+      const newQuote = mockQuoteService.createQuote({
         dossierId,
         clientId,
-        clientName: clientInfo.name || 'Unknown Client',
+        clientName: clientInfo.name || 'Client inconnu',
         agentId: user?.id || null,
         agentName: user?.name || null,
         status: 'pending',
@@ -58,8 +60,14 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
         items: quoteItems
       });
       
+      // Envoyer une notification à l'administrateur
+      if (user?.role !== 'admin') {
+        // Dans un vrai système, nous utiliserions Supabase pour envoyer la notification aux admins
+        console.log('Notification envoyée aux administrateurs concernant le nouveau devis', newQuote.id);
+      }
+      
       clearCart();
-      toast.success('Quote created successfully!');
+      toast.success('Devis créé avec succès !');
       setProcessingQuote(false);
       
       navigate('/quotes');
@@ -88,17 +96,17 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
         throw new Error('Erreur lors de la mise à jour du profil');
       }
       
-      console.log('Profile updated with bank details');
+      console.log('Profil mis à jour avec les données bancaires');
       
       // Use mockDataService instead of direct Supabase calls to bypass RLS issues
       const dossierId = `mock-dossier-${Date.now()}`;
       console.log('Using mock dossier ID:', dossierId);
       
       // Create a mock quote with the mockDataService, including bank details
-      mockQuoteService.createQuote({
+      const newQuote = mockQuoteService.createQuote({
         dossierId,
         clientId: user.id,
-        clientName: user.name || 'Unknown Client',
+        clientName: user.name || 'Client inconnu',
         agentId: null,
         agentName: null,
         status: 'pending',
@@ -114,11 +122,21 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
         bic: bankDetails.bic
       });
 
+      // Ajouter une notification pour l'administrateur
+      addNotification({
+        userId: 'admin', // Dans un vrai scénario, nous enverrions à tous les admins
+        message: `Nouveau devis #${newQuote.id} créé par ${user.name}`,
+        type: 'info',
+        read: false,
+        link: `/quotes/${newQuote.id}`,
+        title: 'Nouveau devis à approuver'
+      });
+
       toast.success('Devis créé avec succès');
       clearCart();
       navigate('/quote');
     } catch (error) {
-      console.error('Error creating quote:', error);
+      console.error('Erreur lors de la création du devis:', error);
       toast.error(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setCreatingQuote(false);

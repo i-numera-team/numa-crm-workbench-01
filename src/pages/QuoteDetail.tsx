@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { mockQuoteService, Quote } from '@/utils/mockData';
@@ -16,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { QuoteFooter } from '@/components/quote/QuoteFooter';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +28,7 @@ export default function QuoteDetail() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [signingQuote, setSigningQuote] = useState(false);
+  const { addNotification } = useNotifications();
   const [bankDetails, setBankDetails] = useState({
     bankName: '',
     iban: '',
@@ -64,7 +67,7 @@ export default function QuoteDetail() {
 
   // Format date for display
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString('fr-FR', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -96,7 +99,9 @@ export default function QuoteDetail() {
         <span className="flex items-start">
           <Clock className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0 mt-0.5" />
           <span>
-            Ce devis est en attente d'approbation.
+            {user?.role === 'admin' 
+              ? 'Ce devis est en attente d\'approbation.'
+              : 'Ce devis est en attente d\'approbation par l\'administrateur.'}
           </span>
         </span>
       );
@@ -122,6 +127,29 @@ export default function QuoteDetail() {
       if (updatedQuote) {
         setQuote(updatedQuote);
         toast.success('Devis signé avec succès');
+        
+        // Envoyer une notification à l'administrateur si c'est un client qui signe
+        if (user.role === 'client') {
+          addNotification({
+            userId: 'admin',
+            message: `Le client ${user.name} a signé le devis #${quote.id}`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${quote.id}`,
+            title: 'Devis signé'
+          });
+        }
+        // Envoyer une notification au client si c'est l'admin qui signe
+        else if (user.role === 'admin' && quote.clientId) {
+          addNotification({
+            userId: quote.clientId,
+            message: `Votre devis #${quote.id} a été approuvé par l'administrateur`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${quote.id}`,
+            title: 'Devis approuvé'
+          });
+        }
       }
       
       setSigningQuote(false);
@@ -148,6 +176,27 @@ export default function QuoteDetail() {
     if (updatedQuote) {
       setQuote(updatedQuote);
       toast.success('Devis rejeté avec succès');
+      
+      // Envoyer des notifications
+      if (user.role === 'admin' && quote.clientId) {
+        addNotification({
+          userId: quote.clientId,
+          message: `Votre devis #${quote.id} a été rejeté par l'administrateur`,
+          type: 'error',
+          read: false,
+          link: `/quotes/${quote.id}`,
+          title: 'Devis rejeté'
+        });
+      } else if (user.role === 'client') {
+        addNotification({
+          userId: 'admin',
+          message: `Le client ${user.name} a rejeté le devis #${quote.id}`,
+          type: 'error',
+          read: false,
+          link: `/quotes/${quote.id}`,
+          title: 'Devis rejeté'
+        });
+      }
     }
     
     setShowRejectDialog(false);
@@ -158,9 +207,11 @@ export default function QuoteDetail() {
   const canSignReject = () => {
     if (!user || !quote) return false;
     
+    // Admin peut approuver ou rejeter les devis en attente
     if (user.role === 'admin') return quote.status === 'pending';
-    if (user.role === 'client' && quote.clientId === user.id) return quote.status === 'pending';
     
+    // Les clients ne peuvent pas signer ou rejeter les devis dans la page de détail
+    // Ils doivent utiliser les boutons dans le footer
     return false;
   };
 
@@ -225,6 +276,18 @@ export default function QuoteDetail() {
     );
   }
 
+  // Déterminer le statut en français
+  const getStatusLabel = (status: Quote['status']) => {
+    switch (status) {
+      case 'draft': return 'Brouillon';
+      case 'pending': return 'En attente';
+      case 'approved': return 'Approuvé';
+      case 'signed': return 'Signé';
+      case 'rejected': return 'Rejeté';
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Back button and header */}
@@ -247,7 +310,7 @@ export default function QuoteDetail() {
         
         <div className="flex items-center space-x-2">
           <span className={getStatusBadge(quote.status)}>
-            {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+            {getStatusLabel(quote.status)}
           </span>
           
           <Button
@@ -295,20 +358,20 @@ export default function QuoteDetail() {
             
             {quote.rejectedAt && (
               <div>
-                <dt className="text-sm font-medium text-gray-500">Réjeté le</dt>
+                <dt className="text-sm font-medium text-gray-500">Rejeté le</dt>
                 <dd className="mt-1">{formatDate(quote.rejectedAt)}</dd>
               </div>
             )}
           </dl>
           
-          {/* Sign/Reject buttons */}
+          {/* Sign/Reject buttons - ADMIN ONLY */}
           {canSignReject() && (
             <div className="mt-8 space-y-3">
               <Button 
                 className="w-full bg-green-600 hover:bg-green-700"
                 onClick={() => setShowSignDialog(true)}
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" /> Signer le devis
+                <CheckCircle2 className="h-4 w-4 mr-2" /> Approuver le devis
               </Button>
               
               <Button 
@@ -316,7 +379,7 @@ export default function QuoteDetail() {
                 className="w-full"
                 onClick={() => setShowRejectDialog(true)}
               >
-                <XCircle className="h-4 w-4 mr-2" /> Réjeter le devis
+                <XCircle className="h-4 w-4 mr-2" /> Rejeter le devis
               </Button>
             </div>
           )}
@@ -357,10 +420,10 @@ export default function QuoteDetail() {
                           {item.quantity}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                          ${item.price.toFixed(2)}
+                          {item.price.toFixed(2)} €
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          {(item.price * item.quantity).toFixed(2)} €
                         </td>
                       </tr>
                     ))}
@@ -372,15 +435,15 @@ export default function QuoteDetail() {
               <div className="border-t pt-4">
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">Sous-total</span>
-                  <span className="text-sm font-medium">${quote.totalPrice.toFixed(2)}</span>
+                  <span className="text-sm font-medium">{quote.totalPrice.toFixed(2)} €</span>
                 </div>
                 <div className="flex justify-between py-2">
-                  <span className="text-sm text-gray-500">Taxe (10%)</span>
-                  <span className="text-sm font-medium">${(quote.totalPrice * 0.1).toFixed(2)}</span>
+                  <span className="text-sm text-gray-500">TVA (10%)</span>
+                  <span className="text-sm font-medium">{(quote.totalPrice * 0.1).toFixed(2)} €</span>
                 </div>
                 <div className="flex justify-between py-2 border-t border-gray-200 mt-2">
                   <span className="text-base font-bold">Total</span>
-                  <span className="text-base font-bold">${(quote.totalPrice * 1.1).toFixed(2)}</span>
+                  <span className="text-base font-bold">{(quote.totalPrice * 1.1).toFixed(2)} €</span>
                 </div>
               </div>
             </div>
@@ -414,6 +477,7 @@ export default function QuoteDetail() {
           bankDetails={bankDetails}
           onAcceptQuote={() => setShowSignDialog(true)}
           status={quote?.status || 'pending'}
+          quoteId={quote?.id}
         />
       </div>
 
@@ -421,9 +485,13 @@ export default function QuoteDetail() {
       <Dialog open={showSignDialog} onOpenChange={setShowSignDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Signer le devis</DialogTitle>
+            <DialogTitle>
+              {user?.role === 'admin' ? 'Approuver le devis' : 'Signer le devis'}
+            </DialogTitle>
             <DialogDescription>
-              Êtes-vous sûr de vouloir signer ce devis? Cette action ne peut pas être annulée.
+              Êtes-vous sûr de vouloir 
+              {user?.role === 'admin' ? ' approuver ' : ' signer '}
+              ce devis? Cette action ne peut pas être annulée.
             </DialogDescription>
           </DialogHeader>
           
@@ -431,11 +499,11 @@ export default function QuoteDetail() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm">Total du devis:</span>
-                <span className="text-sm font-bold">${(quote.totalPrice * 1.1).toFixed(2)}</span>
+                <span className="text-sm font-bold">{(quote.totalPrice * 1.1).toFixed(2)} €</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm">Date:</span>
-                <span className="text-sm">{new Date().toLocaleDateString()}</span>
+                <span className="text-sm">{new Date().toLocaleDateString('fr-FR')}</span>
               </div>
             </div>
           </div>
@@ -455,11 +523,12 @@ export default function QuoteDetail() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  En cours de signature...
+                  {user?.role === 'admin' ? "Approbation en cours..." : "Signature en cours..."}
                 </span>
               ) : (
                 <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> Signer le devis
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> 
+                  {user?.role === 'admin' ? "Approuver le devis" : "Signer le devis"}
                 </>
               )}
             </Button>
@@ -471,7 +540,7 @@ export default function QuoteDetail() {
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Réjeter le devis</DialogTitle>
+            <DialogTitle>Rejeter le devis</DialogTitle>
             <DialogDescription>
               Veuillez fournir une raison pour la réjection de ce devis.
             </DialogDescription>
@@ -498,7 +567,7 @@ export default function QuoteDetail() {
               onClick={handleRejectQuote}
               disabled={!rejectionReason.trim()}
             >
-              <XCircle className="mr-2 h-4 w-4" /> Réjeter le devis
+              <XCircle className="mr-2 h-4 w-4" /> Rejeter le devis
             </Button>
           </DialogFooter>
         </DialogContent>

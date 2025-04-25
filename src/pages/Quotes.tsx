@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockQuoteService, Quote } from '@/utils/mockData';
@@ -31,9 +32,11 @@ import {
 } from '@/components/ui/select';
 import { UserRole } from '@/types/auth';
 import { toast } from 'sonner';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export default function Quotes() {
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [filteredQuotes, setFilteredQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +108,18 @@ export default function Quotes() {
       if (updatedQuote) {
         setQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
         toast.success('Devis approuvé avec succès');
+        
+        // Envoyer une notification au client
+        if (updatedQuote.clientId) {
+          addNotification({
+            userId: updatedQuote.clientId,
+            message: `Votre devis #${updatedQuote.id} a été approuvé par l'administrateur`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${updatedQuote.id}`,
+            title: 'Devis approuvé'
+          });
+        }
       }
       
       setSigningQuote(false);
@@ -131,6 +146,29 @@ export default function Quotes() {
       if (updatedQuote) {
         setQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
         toast.success('Devis signé avec succès');
+        
+        // Envoyer une notification
+        if (user.role === 'client') {
+          // Si c'est un client qui signe, notifier l'admin
+          addNotification({
+            userId: 'admin',
+            message: `Le client ${user.name} a signé le devis #${updatedQuote.id}`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${updatedQuote.id}`,
+            title: 'Devis signé'
+          });
+        } else if (user.role === 'admin' && updatedQuote.clientId) {
+          // Si c'est l'admin qui signe, notifier le client
+          addNotification({
+            userId: updatedQuote.clientId,
+            message: `Votre devis #${updatedQuote.id} a été signé par l'administrateur`,
+            type: 'success',
+            read: false,
+            link: `/quotes/${updatedQuote.id}`,
+            title: 'Devis signé'
+          });
+        }
       }
       
       setSigningQuote(false);
@@ -153,6 +191,27 @@ export default function Quotes() {
     if (updatedQuote) {
       setQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
       toast.success('Devis rejeté');
+      
+      // Envoyer une notification
+      if (user.role === 'admin' && updatedQuote.clientId) {
+        addNotification({
+          userId: updatedQuote.clientId,
+          message: `Votre devis #${updatedQuote.id} a été rejeté par l'administrateur`,
+          type: 'error',
+          read: false,
+          link: `/quotes/${updatedQuote.id}`,
+          title: 'Devis rejeté'
+        });
+      } else if (user.role === 'client') {
+        addNotification({
+          userId: 'admin',
+          message: `Le client ${user.name} a rejeté le devis #${updatedQuote.id}`,
+          type: 'error',
+          read: false,
+          link: `/quotes/${updatedQuote.id}`,
+          title: 'Devis rejeté'
+        });
+      }
     }
     
     setShowRejectDialog(false);
@@ -203,49 +262,6 @@ export default function Quotes() {
     }
     
     return `${bgColor} ${textColor} px-2 py-1 rounded-full text-xs font-medium`;
-  };
-
-  // Determine which quotes a user can sign/reject based on role
-  const canSignRejectQuote = (quote: Quote, role: UserRole): boolean => {
-    if (role === 'admin') return true;
-    if (role === 'client' && quote.clientId === user?.id && quote.status === 'pending') return true;
-    return false;
-  };
-
-  // Admin-specific actions on quotes
-  const renderAdminActions = (quote: Quote) => {
-    if (user?.role !== 'admin') return null;
-    
-    // If quote is pending, show approve/reject buttons
-    if (quote.status === 'pending') {
-      return (
-        <>
-          <Button
-            size="sm"
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => {
-              setQuoteToApprove(quote);
-              setShowApproveDialog(true);
-            }}
-          >
-            <CheckCircle2 className="h-4 w-4 mr-1" /> Approuver
-          </Button>
-          
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => {
-              setQuoteToReject(quote);
-              setShowRejectDialog(true);
-            }}
-          >
-            <XCircle className="h-4 w-4 mr-1" /> Rejeter
-          </Button>
-        </>
-      );
-    }
-    
-    return null;
   };
 
   // Show loading state

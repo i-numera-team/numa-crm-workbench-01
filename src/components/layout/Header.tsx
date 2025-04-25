@@ -10,6 +10,7 @@ import {
   DropdownMenuItem
 } from '@/components/ui/dropdown-menu';
 import { useState, useEffect } from 'react';
+import { NotificationsMenu } from './NotificationsMenu';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -103,10 +104,10 @@ export default function Header() {
             </span>
           )}
         </Link>
-        <button className="p-2 relative" title="Notifications">
-          <Bell className="h-6 w-6 text-gray-600 dark:text-white" />
-          <span className="absolute top-0 right-0 bg-red-500 w-2.5 h-2.5 rounded-full"></span>
-        </button>
+        
+        {/* Remplacer le bouton de notifications par notre composant NotificationsMenu */}
+        <NotificationsMenu />
+        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center space-x-2">

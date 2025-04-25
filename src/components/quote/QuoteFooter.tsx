@@ -1,6 +1,8 @@
 
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface BankDetails {
   bankName: string;
@@ -12,11 +14,29 @@ interface QuoteFooterProps {
   bankDetails: BankDetails;
   onAcceptQuote: () => void;
   status: 'draft' | 'pending' | 'approved' | 'signed' | 'rejected';
+  quoteId?: string;
 }
 
-export function QuoteFooter({ bankDetails, onAcceptQuote, status }: QuoteFooterProps) {
+export function QuoteFooter({ bankDetails, onAcceptQuote, status, quoteId }: QuoteFooterProps) {
   const currentDate = new Date().toLocaleDateString('fr-FR');
   const canPrint = status === 'approved' || status === 'signed';
+  const { user } = useAuth();
+  const { addNotification } = useNotifications();
+  
+  const handleAcceptQuote = () => {
+    // Avant d'appeler onAcceptQuote, nous ajoutons une notification pour l'administrateur
+    if (user?.role === 'client' && quoteId) {
+      addNotification({
+        userId: 'admin', // Dans un vrai système, ce serait l'ID de l'administrateur
+        message: `Le devis #${quoteId} a été accepté par ${user.name}`,
+        type: 'success',
+        read: false,
+        link: `/quotes/${quoteId}`,
+        title: 'Devis accepté'
+      });
+    }
+    onAcceptQuote();
+  };
 
   const handlePrint = () => {
     const printContent = document.getElementById('quotePrintable');
@@ -104,9 +124,10 @@ export function QuoteFooter({ bankDetails, onAcceptQuote, status }: QuoteFooterP
           </Button>
         )}
         
-        {status === 'pending' && (
+        {/* Afficher le bouton d'acceptation uniquement pour les clients et si le statut est en attente */}
+        {status === 'pending' && user?.role === 'client' && (
           <Button 
-            onClick={onAcceptQuote}
+            onClick={handleAcceptQuote}
             className="bg-green-600 hover:bg-green-700 text-white print:hidden"
           >
             Accepter le devis
