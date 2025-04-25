@@ -71,6 +71,39 @@ export default function QuoteDetail() {
     });
   };
 
+  // Get status notes
+  const getStatusNotes = () => {
+    if (quote?.status === 'signed') {
+      return (
+        <span className="flex items-start">
+          <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+          <span>
+            Ce devis a été approuvé et signé le {formatDate(quote.signedAt || quote.updatedAt)}.
+          </span>
+        </span>
+      );
+    } else if (quote?.status === 'rejected') {
+      return (
+        <span className="flex items-start">
+          <XCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+          <span>
+            Ce devis a été rejeté le {formatDate(quote.rejectedAt || quote.updatedAt)}.
+          </span>
+        </span>
+      );
+    } else if (quote?.status === 'pending') {
+      return (
+        <span className="flex items-start">
+          <Clock className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0 mt-0.5" />
+          <span>
+            Ce devis est en attente d'approbation.
+          </span>
+        </span>
+      );
+    }
+    return "Aucune note disponible.";
+  };
+
   // Handle signing quote
   const handleSignQuote = () => {
     if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
@@ -357,30 +390,7 @@ export default function QuoteDetail() {
               <h4 className="font-medium mb-2">Notes</h4>
               <div className="bg-gray-50 p-4 rounded-md text-sm">
                 <p className="text-gray-600">
-                  {quote.status === 'signed' ? (
-                    <span className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span>
-                        Ce devis a été approuvé et signé par {quote.clientName} le {formatDate(quote.signedAt || quote.updatedAt)}.
-                      </span>
-                    </span>
-                  ) : quote.status === 'rejected' ? (
-                    <span className="flex items-start">
-                      <XCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span>
-                        Ce devis a été rejeté par {quote.clientName} le {formatDate(quote.rejectedAt || quote.updatedAt)}.
-                      </span>
-                    </span>
-                  ) : quote.status === 'pending' ? (
-                    <span className="flex items-start">
-                      <Clock className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span>
-                        Ce devis est en attente d'approbation de {quote.clientName}.
-                      </span>
-                    </span>
-                  ) : (
-                    "Autres notes et termes seront affichés ici."
-                  )}
+                  {getStatusNotes()}
                 </p>
               </div>
             </div>

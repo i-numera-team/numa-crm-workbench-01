@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockQuoteService, Quote } from '@/utils/mockData';
@@ -85,7 +84,7 @@ export default function Quotes() {
 
   // Format date for display
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
   // Handle approving quote (admin only)
@@ -159,6 +158,17 @@ export default function Quotes() {
     setShowRejectDialog(false);
     setQuoteToReject(null);
     setRejectionReason('');
+  };
+
+  const getStatusBadgeLabel = (status: Quote['status']) => {
+    switch (status) {
+      case 'draft': return 'Brouillon';
+      case 'pending': return 'En attente';
+      case 'approved': return 'Approuvé';
+      case 'signed': return 'Signé';
+      case 'rejected': return 'Rejeté';
+      default: return status;
+    }
   };
 
   // Get status badge classes
@@ -238,15 +248,24 @@ export default function Quotes() {
     return null;
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-numa-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Quotes</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Devis</h1>
           <p className="text-muted-foreground">
             {user?.role === 'client' 
-              ? 'View and manage your quotes' 
-              : 'View and manage client quotes'}
+              ? 'Consultez vos devis' 
+              : 'Gérez les devis clients'}
           </p>
         </div>
       </div>
@@ -257,7 +276,7 @@ export default function Quotes() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search quotes..."
+              placeholder="Rechercher un devis..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -266,15 +285,15 @@ export default function Quotes() {
           <div className="w-full sm:w-44">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder="Filtrer par statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="signed">Signed</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="draft">Brouillon</SelectItem>
+                <SelectItem value="pending">En attente</SelectItem>
+                <SelectItem value="approved">Approuvé</SelectItem>
+                <SelectItem value="signed">Signé</SelectItem>
+                <SelectItem value="rejected">Rejeté</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -292,11 +311,11 @@ export default function Quotes() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Quote ID</TableHead>
+                  <TableHead>ID Devis</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead>Created On</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Créé le</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -306,10 +325,10 @@ export default function Quotes() {
                     <TableCell className="font-medium">#{quote.id}</TableCell>
                     <TableCell>{quote.clientName}</TableCell>
                     <TableCell>{formatDate(quote.createdAt)}</TableCell>
-                    <TableCell>${quote.totalPrice.toFixed(2)}</TableCell>
+                    <TableCell>{quote.totalPrice.toFixed(2)} €</TableCell>
                     <TableCell>
                       <span className={getStatusBadge(quote.status)}>
-                        {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                        {getStatusBadgeLabel(quote.status)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -320,17 +339,12 @@ export default function Quotes() {
                           asChild
                         >
                           <Link to={`/quotes/${quote.id}`}>
-                            <Eye className="h-4 w-4 mr-1" /> View
+                            <Eye className="h-4 w-4 mr-1" /> Voir
                           </Link>
                         </Button>
                         
-                        {/* Admin-specific actions */}
-                        {renderAdminActions(quote)}
-                        
-                        {/* Client actions - can sign/reject pending quotes */}
-                        {(user?.role === 'client' && 
-                          quote.clientId === user.id && 
-                          quote.status === 'pending') && (
+                        {/* Actions d'administration - uniquement pour l'admin */}
+                        {user?.role === 'admin' && quote.status === 'pending' && (
                           <>
                             <Button
                               size="sm"
@@ -340,7 +354,7 @@ export default function Quotes() {
                                 setShowApproveDialog(true);
                               }}
                             >
-                              <CheckCircle2 className="h-4 w-4 mr-1" /> Signer
+                              <CheckCircle2 className="h-4 w-4 mr-1" /> Approuver
                             </Button>
                             
                             <Button
@@ -367,134 +381,134 @@ export default function Quotes() {
             <div className="rounded-full bg-gray-100 p-6 mb-4">
               <FileText className="h-12 w-12 text-gray-400" />
             </div>
-            <h3 className="text-xl font-medium">No quotes found</h3>
+            <h3 className="text-xl font-medium">Aucun devis trouvé</h3>
             <p className="text-gray-500 mt-2">
               {searchQuery || statusFilter !== 'all'
-                ? 'Try adjusting your search or filters'
+                ? 'Essayez d\'ajuster votre recherche ou vos filtres'
                 : user?.role === 'client' 
-                ? 'You do not have any quotes yet'
-                : 'No quotes available'}
+                ? 'Vous n\'avez pas encore de devis'
+                : 'Aucun devis disponible'}
             </p>
           </div>
         )}
       </Card>
 
-      {/* Approve/sign quote dialog - pour l'admin, c'est "Approuver", pour le client c'est "Signer" */}
-      <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {user?.role === 'admin' ? 'Approuver le devis' : 'Signer le devis'}
-            </DialogTitle>
-            <DialogDescription>
-              {user?.role === 'admin' 
-                ? "Êtes-vous sûr de vouloir approuver ce devis ?"
-                : "Êtes-vous sûr de vouloir signer ce devis ?"}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {quoteToApprove && (
-            <div className="py-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm">Devis ID:</span>
-                  <span className="text-sm font-medium">#{quoteToApprove.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Client:</span>
-                  <span className="text-sm font-medium">{quoteToApprove.clientName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Montant total:</span>
-                  <span className="text-sm font-medium">${quoteToApprove.totalPrice.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Date:</span>
-                  <span className="text-sm font-medium">{formatDate(quoteToApprove.createdAt)}</span>
+      {/* Approve quote dialog - Admin only */}
+      {user?.role === 'admin' && (
+        <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Approuver le devis</DialogTitle>
+              <DialogDescription>
+                Êtes-vous sûr de vouloir approuver ce devis ?
+              </DialogDescription>
+            </DialogHeader>
+            
+            {quoteToApprove && (
+              <div className="py-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Devis ID:</span>
+                    <span className="text-sm font-medium">#{quoteToApprove.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Client:</span>
+                    <span className="text-sm font-medium">{quoteToApprove.clientName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Montant total:</span>
+                    <span className="text-sm font-medium">{quoteToApprove.totalPrice.toFixed(2)} €</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Date:</span>
+                    <span className="text-sm font-medium">{formatDate(quoteToApprove.createdAt)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApproveDialog(false)}>
-              Annuler
-            </Button>
-            <Button 
-              className="bg-green-600 hover:bg-green-700" 
-              onClick={user?.role === 'admin' ? handleApproveQuote : handleSignQuote}
-              disabled={signingQuote}
-            >
-              {signingQuote ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {user?.role === 'admin' ? 'Approbation...' : 'Signature...'}
-                </span>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" /> 
-                  {user?.role === 'admin' ? 'Approuver' : 'Signer'}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowApproveDialog(false)}>
+                Annuler
+              </Button>
+              <Button 
+                className="bg-green-600 hover:bg-green-700" 
+                onClick={handleApproveQuote}
+                disabled={signingQuote}
+              >
+                {signingQuote ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Approbation en cours...
+                  </span>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" /> 
+                    Approuver
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* Reject quote dialog */}
-      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Reject Quote</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting this quote.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {quoteToReject && (
-            <div className="py-4 space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm">Quote ID:</span>
-                  <span className="text-sm font-medium">#{quoteToReject.id}</span>
+      {/* Reject quote dialog - Admin only */}
+      {user?.role === 'admin' && (
+        <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Rejeter le devis</DialogTitle>
+              <DialogDescription>
+                Veuillez fournir une raison pour le rejet de ce devis.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {quoteToReject && (
+              <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Devis ID:</span>
+                    <span className="text-sm font-medium">#{quoteToReject.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Montant total:</span>
+                    <span className="text-sm font-medium">{quoteToReject.totalPrice.toFixed(2)} €</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Total Amount:</span>
-                  <span className="text-sm font-medium">${quoteToReject.totalPrice.toFixed(2)}</span>
+                
+                <div className="space-y-2">
+                  <label htmlFor="rejection-reason" className="text-sm font-medium">
+                    Raison du rejet
+                  </label>
+                  <Input
+                    id="rejection-reason"
+                    placeholder="Veuillez fournir une raison"
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                  />
                 </div>
               </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="rejection-reason" className="text-sm font-medium">
-                  Rejection Reason
-                </label>
-                <Input
-                  id="rejection-reason"
-                  placeholder="Please provide a reason"
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleRejectQuote}
-              disabled={!rejectionReason.trim()}
-            >
-              <XCircle className="h-4 w-4 mr-2" /> Reject Quote
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
+                Annuler
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleRejectQuote}
+                disabled={!rejectionReason.trim()}
+              >
+                <XCircle className="h-4 w-4 mr-2" /> Rejeter le devis
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
