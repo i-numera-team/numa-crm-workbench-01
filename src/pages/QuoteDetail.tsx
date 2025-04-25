@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { mockDataService, Quote } from '@/utils/mockData';
+import { mockQuoteService, Quote } from '@/utils/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { QuoteFooter } from '@/components/quote/QuoteFooter';
 
 export default function QuoteDetail() {
   const { id } = useParams<{ id: string }>();
@@ -26,13 +26,28 @@ export default function QuoteDetail() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [signingQuote, setSigningQuote] = useState(false);
+  const [bankDetails, setBankDetails] = useState({
+    bankName: '',
+    iban: '',
+    bic: ''
+  });
 
   useEffect(() => {
     if (!id) return;
 
     // Load quote details
-    const loadedQuote = mockDataService.getQuoteById(id);
+    const loadedQuote = mockQuoteService.getQuoteById(id);
     setQuote(loadedQuote || null);
+
+    // Extract bank details if available
+    if (loadedQuote) {
+      setBankDetails({
+        bankName: loadedQuote.bankName || '',
+        iban: loadedQuote.iban || '',
+        bic: loadedQuote.bic || ''
+      });
+    }
+
     setLoading(false);
   }, [id]);
 
@@ -64,7 +79,7 @@ export default function QuoteDetail() {
     
     // Simulate signing delay
     setTimeout(() => {
-      const updatedQuote = mockDataService.updateQuoteStatus(
+      const updatedQuote = mockQuoteService.updateQuoteStatus(
         quote.id, 
         'signed',
         user.id,
@@ -73,7 +88,7 @@ export default function QuoteDetail() {
       
       if (updatedQuote) {
         setQuote(updatedQuote);
-        toast.success('Quote signed successfully');
+        toast.success('Devis signé avec succès');
       }
       
       setSigningQuote(false);
@@ -86,11 +101,11 @@ export default function QuoteDetail() {
     if (!quote || (user?.role !== 'client' && user?.role !== 'admin')) return;
     
     if (!rejectionReason.trim()) {
-      toast.error('Please provide a reason for rejection');
+      toast.error('Veuillez fournir une raison pour la réjection');
       return;
     }
     
-    const updatedQuote = mockDataService.updateQuoteStatus(
+    const updatedQuote = mockQuoteService.updateQuoteStatus(
       quote.id, 
       'rejected',
       user.id,
@@ -99,7 +114,7 @@ export default function QuoteDetail() {
     
     if (updatedQuote) {
       setQuote(updatedQuote);
-      toast.success('Quote rejected successfully');
+      toast.success('Devis rejeté avec succès');
     }
     
     setShowRejectDialog(false);
@@ -163,14 +178,14 @@ export default function QuoteDetail() {
   if (!loading && (!quote || !hasAccess())) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <h2 className="text-2xl font-bold mb-4">Quote not found</h2>
+        <h2 className="text-2xl font-bold mb-4">Devis introuvable</h2>
         <p className="text-gray-500 mb-8">
-          The quote you're looking for doesn't exist or you don't have permission to access it.
+          Le devis que vous recherchez n'existe pas ou vous n'avez pas la permission d'y accéder.
         </p>
         <Button asChild variant="outline">
           <Link to="/quotes">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Quotes
+            Retour aux devis
           </Link>
         </Button>
       </div>
@@ -187,13 +202,13 @@ export default function QuoteDetail() {
             className="inline-flex items-center text-numa-500 hover:text-numa-600 mb-6"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Quotes
+            Retour aux devis
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">
-            Quote #{quote.id}
+            Devis #{quote.id}
           </h1>
           <p className="text-muted-foreground">
-            Created {formatDate(quote.createdAt)}
+            Créé le {formatDate(quote.createdAt)}
           </p>
         </div>
         
@@ -206,9 +221,9 @@ export default function QuoteDetail() {
             variant="outline"
             size="sm"
             className="ml-2"
-            onClick={() => toast.success('Quote downloaded successfully!')}
+            onClick={() => toast.success('Devis téléchargé avec succès!')}
           >
-            <Download className="h-4 w-4 mr-2" /> Download
+            <Download className="h-4 w-4 mr-2" /> Télécharger
           </Button>
         </div>
       </div>
@@ -216,7 +231,7 @@ export default function QuoteDetail() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Quote info card */}
         <Card className="md:col-span-1 p-6">
-          <h3 className="text-lg font-medium mb-4">Quote Information</h3>
+          <h3 className="text-lg font-medium mb-4">Informations du devis</h3>
           <dl className="space-y-4">
             <div>
               <dt className="text-sm font-medium text-gray-500">Client</dt>
@@ -224,30 +239,30 @@ export default function QuoteDetail() {
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Created By</dt>
+              <dt className="text-sm font-medium text-gray-500">Créé par</dt>
               <dd className="mt-1">{quote.agentName}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Created Date</dt>
+              <dt className="text-sm font-medium text-gray-500">Créé le</dt>
               <dd className="mt-1">{formatDate(quote.createdAt)}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
+              <dt className="text-sm font-medium text-gray-500">Dernière mise à jour</dt>
               <dd className="mt-1">{formatDate(quote.updatedAt)}</dd>
             </div>
             
             {quote.signedAt && (
               <div>
-                <dt className="text-sm font-medium text-gray-500">Signed Date</dt>
+                <dt className="text-sm font-medium text-gray-500">Signé le</dt>
                 <dd className="mt-1">{formatDate(quote.signedAt)}</dd>
               </div>
             )}
             
             {quote.rejectedAt && (
               <div>
-                <dt className="text-sm font-medium text-gray-500">Rejected Date</dt>
+                <dt className="text-sm font-medium text-gray-500">Réjeté le</dt>
                 <dd className="mt-1">{formatDate(quote.rejectedAt)}</dd>
               </div>
             )}
@@ -260,7 +275,7 @@ export default function QuoteDetail() {
                 className="w-full bg-green-600 hover:bg-green-700"
                 onClick={() => setShowSignDialog(true)}
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" /> Sign Quote
+                <CheckCircle2 className="h-4 w-4 mr-2" /> Signer le devis
               </Button>
               
               <Button 
@@ -268,7 +283,7 @@ export default function QuoteDetail() {
                 className="w-full"
                 onClick={() => setShowRejectDialog(true)}
               >
-                <XCircle className="h-4 w-4 mr-2" /> Reject Quote
+                <XCircle className="h-4 w-4 mr-2" /> Réjeter le devis
               </Button>
             </div>
           )}
@@ -277,7 +292,7 @@ export default function QuoteDetail() {
         {/* Quote details */}
         <div className="md:col-span-2">
           <Card className="p-6">
-            <h3 className="text-lg font-medium mb-4">Quote Details</h3>
+            <h3 className="text-lg font-medium mb-4">Détails du devis</h3>
             
             <div className="space-y-6">
               {/* Quote items table */}
@@ -286,13 +301,13 @@ export default function QuoteDetail() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Item
+                        Article
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Quantity
+                        Quantité
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Unit Price
+                        Prix unitaire
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Total
@@ -323,11 +338,11 @@ export default function QuoteDetail() {
               {/* Quote summary */}
               <div className="border-t pt-4">
                 <div className="flex justify-between py-2">
-                  <span className="text-sm text-gray-500">Subtotal</span>
+                  <span className="text-sm text-gray-500">Sous-total</span>
                   <span className="text-sm font-medium">${quote.totalPrice.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-2">
-                  <span className="text-sm text-gray-500">Tax (10%)</span>
+                  <span className="text-sm text-gray-500">Taxe (10%)</span>
                   <span className="text-sm font-medium">${(quote.totalPrice * 0.1).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-2 border-t border-gray-200 mt-2">
@@ -346,25 +361,25 @@ export default function QuoteDetail() {
                     <span className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
                       <span>
-                        This quote was approved and signed by {quote.clientName} on {formatDate(quote.signedAt || quote.updatedAt)}.
+                        Ce devis a été approuvé et signé par {quote.clientName} le {formatDate(quote.signedAt || quote.updatedAt)}.
                       </span>
                     </span>
                   ) : quote.status === 'rejected' ? (
                     <span className="flex items-start">
                       <XCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
                       <span>
-                        This quote was rejected by {quote.clientName} on {formatDate(quote.rejectedAt || quote.updatedAt)}.
+                        Ce devis a été rejeté par {quote.clientName} le {formatDate(quote.rejectedAt || quote.updatedAt)}.
                       </span>
                     </span>
                   ) : quote.status === 'pending' ? (
                     <span className="flex items-start">
                       <Clock className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0 mt-0.5" />
                       <span>
-                        This quote is awaiting approval from {quote.clientName}.
+                        Ce devis est en attente d'approbation de {quote.clientName}.
                       </span>
                     </span>
                   ) : (
-                    "Additional notes and terms will be displayed here."
+                    "Autres notes et termes seront affichés ici."
                   )}
                 </p>
               </div>
@@ -376,27 +391,36 @@ export default function QuoteDetail() {
                 to={`/dossiers/${quote.dossierId}`}
                 className="text-numa-500 hover:text-numa-600 hover:underline text-sm font-medium"
               >
-                View related dossier
+                Voir le dossier lié
               </Link>
             </div>
           </Card>
         </div>
       </div>
 
+      {/* Footer with bank details and action buttons */}
+      <div className="mt-6">
+        <QuoteFooter 
+          bankDetails={bankDetails}
+          onAcceptQuote={() => setShowSignDialog(true)}
+          status={quote?.status || 'pending'}
+        />
+      </div>
+
       {/* Sign quote dialog */}
       <Dialog open={showSignDialog} onOpenChange={setShowSignDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Sign Quote</DialogTitle>
+            <DialogTitle>Signer le devis</DialogTitle>
             <DialogDescription>
-              Are you sure you want to sign this quote? This action cannot be undone.
+              Êtes-vous sûr de vouloir signer ce devis? Cette action ne peut pas être annulée.
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4">
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm">Quote Total:</span>
+                <span className="text-sm">Total du devis:</span>
                 <span className="text-sm font-bold">${(quote.totalPrice * 1.1).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
@@ -408,7 +432,7 @@ export default function QuoteDetail() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSignDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button 
               className="bg-green-600 hover:bg-green-700"
@@ -421,11 +445,11 @@ export default function QuoteDetail() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Signing...
+                  En cours de signature...
                 </span>
               ) : (
                 <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> Sign Quote
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Signer le devis
                 </>
               )}
             </Button>
@@ -437,19 +461,19 @@ export default function QuoteDetail() {
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Reject Quote</DialogTitle>
+            <DialogTitle>Réjeter le devis</DialogTitle>
             <DialogDescription>
-              Please provide a reason for rejecting this quote.
+              Veuillez fournir une raison pour la réjection de ce devis.
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4">
             <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">
-              Reason for rejection
+              Raison de la réjection
             </label>
             <Input
               id="reason"
-              placeholder="Enter your reason here"
+              placeholder="Entrez votre raison ici"
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
             />
@@ -457,14 +481,14 @@ export default function QuoteDetail() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button 
               variant="destructive"
               onClick={handleRejectQuote}
               disabled={!rejectionReason.trim()}
             >
-              <XCircle className="mr-2 h-4 w-4" /> Reject Quote
+              <XCircle className="mr-2 h-4 w-4" /> Réjeter le devis
             </Button>
           </DialogFooter>
         </DialogContent>

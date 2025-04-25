@@ -16,6 +16,10 @@ export interface Quote {
   rejectedAt?: string;
   dossierId?: string;
   items: CartItem[];
+  // Ajout des champs bancaires
+  bankName?: string;
+  iban?: string;
+  bic?: string;
 }
 
 export interface Activity {

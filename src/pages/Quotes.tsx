@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockDataService, Quote } from '@/utils/mockData';
+import { mockQuoteService, Quote } from '@/utils/mockData';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,10 +52,10 @@ export default function Quotes() {
     
     if (user?.role === 'client') {
       // Client can only see their own quotes
-      loadedQuotes = mockDataService.getQuotesByClientId(user.id);
+      loadedQuotes = mockQuoteService.getQuotesByClientId(user.id);
     } else {
       // Agent and admin can see all quotes
-      loadedQuotes = mockDataService.getQuotes();
+      loadedQuotes = mockQuoteService.getQuotes();
     }
     
     setQuotes(loadedQuotes);
@@ -88,6 +88,32 @@ export default function Quotes() {
     return new Date(dateString).toLocaleDateString();
   };
 
+  // Handle approving quote (admin only)
+  const handleApproveQuote = () => {
+    if (!quoteToApprove || user?.role !== 'admin') return;
+    
+    setSigningQuote(true);
+    
+    // Simulate approval delay
+    setTimeout(() => {
+      const updatedQuote = mockQuoteService.updateQuoteStatus(
+        quoteToApprove.id, 
+        'approved',
+        user.id,
+        user.name
+      );
+      
+      if (updatedQuote) {
+        setQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
+        toast.success('Devis approuvé avec succès');
+      }
+      
+      setSigningQuote(false);
+      setShowApproveDialog(false);
+      setQuoteToApprove(null);
+    }, 1000);
+  };
+
   // Handle signing quote (client role or admin)
   const handleSignQuote = () => {
     if (!quoteToApprove || (user?.role !== 'client' && user?.role !== 'admin')) return;
@@ -96,7 +122,7 @@ export default function Quotes() {
     
     // Simulate signing delay
     setTimeout(() => {
-      const updatedQuote = mockDataService.updateQuoteStatus(
+      const updatedQuote = mockQuoteService.updateQuoteStatus(
         quoteToApprove.id, 
         'signed',
         user.id,
@@ -105,7 +131,7 @@ export default function Quotes() {
       
       if (updatedQuote) {
         setQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
-        toast.success('Quote signed successfully');
+        toast.success('Devis signé avec succès');
       }
       
       setSigningQuote(false);
@@ -118,7 +144,7 @@ export default function Quotes() {
   const handleRejectQuote = () => {
     if (!quoteToReject || (user?.role !== 'client' && user?.role !== 'admin')) return;
     
-    const updatedQuote = mockDataService.updateQuoteStatus(
+    const updatedQuote = mockQuoteService.updateQuoteStatus(
       quoteToReject.id, 
       'rejected',
       user.id,
@@ -127,7 +153,7 @@ export default function Quotes() {
     
     if (updatedQuote) {
       setQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
-      toast.success('Quote rejected');
+      toast.success('Devis rejeté');
     }
     
     setShowRejectDialog(false);
@@ -174,6 +200,42 @@ export default function Quotes() {
     if (role === 'admin') return true;
     if (role === 'client' && quote.clientId === user?.id && quote.status === 'pending') return true;
     return false;
+  };
+
+  // Admin-specific actions on quotes
+  const renderAdminActions = (quote: Quote) => {
+    if (user?.role !== 'admin') return null;
+    
+    // If quote is pending, show approve/reject buttons
+    if (quote.status === 'pending') {
+      return (
+        <>
+          <Button
+            size="sm"
+            className="bg-green-600 hover:bg-green-700"
+            onClick={() => {
+              setQuoteToApprove(quote);
+              setShowApproveDialog(true);
+            }}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Approuver
+          </Button>
+          
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              setQuoteToReject(quote);
+              setShowRejectDialog(true);
+            }}
+          >
+            <XCircle className="h-4 w-4 mr-1" /> Rejeter
+          </Button>
+        </>
+      );
+    }
+    
+    return null;
   };
 
   return (
@@ -262,8 +324,13 @@ export default function Quotes() {
                           </Link>
                         </Button>
                         
-                        {/* Show sign/reject buttons only for appropriate roles and statuses */}
-                        {(canSignRejectQuote(quote, user?.role as UserRole) && quote.status === 'pending') && (
+                        {/* Admin-specific actions */}
+                        {renderAdminActions(quote)}
+                        
+                        {/* Client actions - can sign/reject pending quotes */}
+                        {(user?.role === 'client' && 
+                          quote.clientId === user.id && 
+                          quote.status === 'pending') && (
                           <>
                             <Button
                               size="sm"
@@ -273,7 +340,7 @@ export default function Quotes() {
                                 setShowApproveDialog(true);
                               }}
                             >
-                              <CheckCircle2 className="h-4 w-4 mr-1" /> Sign
+                              <CheckCircle2 className="h-4 w-4 mr-1" /> Signer
                             </Button>
                             
                             <Button
@@ -284,7 +351,7 @@ export default function Quotes() {
                                 setShowRejectDialog(true);
                               }}
                             >
-                              <XCircle className="h-4 w-4 mr-1" /> Reject
+                              <XCircle className="h-4 w-4 mr-1" /> Rejeter
                             </Button>
                           </>
                         )}
@@ -312,13 +379,17 @@ export default function Quotes() {
         )}
       </Card>
 
-      {/* Approve/sign quote dialog */}
+      {/* Approve/sign quote dialog - pour l'admin, c'est "Approuver", pour le client c'est "Signer" */}
       <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Sign Quote</DialogTitle>
+            <DialogTitle>
+              {user?.role === 'admin' ? 'Approuver le devis' : 'Signer le devis'}
+            </DialogTitle>
             <DialogDescription>
-              Are you sure you want to sign this quote?
+              {user?.role === 'admin' 
+                ? "Êtes-vous sûr de vouloir approuver ce devis ?"
+                : "Êtes-vous sûr de vouloir signer ce devis ?"}
             </DialogDescription>
           </DialogHeader>
           
@@ -326,7 +397,7 @@ export default function Quotes() {
             <div className="py-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm">Quote ID:</span>
+                  <span className="text-sm">Devis ID:</span>
                   <span className="text-sm font-medium">#{quoteToApprove.id}</span>
                 </div>
                 <div className="flex justify-between">
@@ -334,7 +405,7 @@ export default function Quotes() {
                   <span className="text-sm font-medium">{quoteToApprove.clientName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm">Total Amount:</span>
+                  <span className="text-sm">Montant total:</span>
                   <span className="text-sm font-medium">${quoteToApprove.totalPrice.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -347,11 +418,11 @@ export default function Quotes() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowApproveDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button 
               className="bg-green-600 hover:bg-green-700" 
-              onClick={handleSignQuote}
+              onClick={user?.role === 'admin' ? handleApproveQuote : handleSignQuote}
               disabled={signingQuote}
             >
               {signingQuote ? (
@@ -360,11 +431,12 @@ export default function Quotes() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Signing...
+                  {user?.role === 'admin' ? 'Approbation...' : 'Signature...'}
                 </span>
               ) : (
                 <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" /> Sign Quote
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> 
+                  {user?.role === 'admin' ? 'Approuver' : 'Signer'}
                 </>
               )}
             </Button>

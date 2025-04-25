@@ -1,4 +1,3 @@
-
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -57,19 +56,16 @@ export default function Quote() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-white shadow-lg print:shadow-none [&_*]:text-gray-900 dark:[&_*]:text-gray-900">
-        <div className="p-8 print:p-0">
-          <QuoteHeader user={user} />
-          <ClientInfo user={user} />
-          <QuoteLineItems lineItems={lineItems} />
-          <QuoteTotals totalPrice={totalPrice} />
-          <QuoteFooter 
-            bankDetails={bankDetails}
-            onAcceptQuote={handleAcceptQuote}
-          />
-        </div>
-      </div>
-    </div>
+    <>
+      <QuoteHeader user={user} />
+      <ClientInfo user={user} />
+      <QuoteLineItems lineItems={lineItems} />
+      <QuoteTotals totalPrice={totalPrice} />
+      <QuoteFooter 
+        bankDetails={bankDetails} 
+        onAcceptQuote={handleAcceptQuote}
+        status={quotes.length > 0 ? quotes[0].status : 'pending'}
+      />
+    </>
   );
 }

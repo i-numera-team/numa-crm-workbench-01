@@ -2,9 +2,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockDataService } from '@/utils/mockData';
+import { mockQuoteService } from '@/utils/mockData';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { BankDetails } from '@/components/BankDetailsForm';
 import { profileService } from '@/services';
 
@@ -48,12 +47,12 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       
       const dossierId = '1';
       
-      mockDataService.createQuote({
+      mockQuoteService.createQuote({
         dossierId,
         clientId,
         clientName: clientInfo.name || 'Unknown Client',
-        agentId: user?.id || '2',
-        agentName: user?.name || 'Unknown Agent',
+        agentId: user?.id || null,
+        agentName: user?.name || null,
         status: 'pending',
         totalPrice,
         items: quoteItems
@@ -95,21 +94,24 @@ export function useQuoteActions(cartItems: any[], totalPrice: number, clearCart:
       const dossierId = `mock-dossier-${Date.now()}`;
       console.log('Using mock dossier ID:', dossierId);
       
-      // Create a mock quote with the mockDataService
-      mockDataService.createQuote({
+      // Create a mock quote with the mockDataService, including bank details
+      mockQuoteService.createQuote({
         dossierId,
         clientId: user.id,
         clientName: user.name || 'Unknown Client',
-        agentId: null, // This can be null as documented in the mockDataService interface
-        agentName: null, // This can be null as documented in the mockDataService interface
-        status: 'pending_admin',
-        totalPrice: totalPrice * 1.2,
+        agentId: null,
+        agentName: null,
+        status: 'pending',
+        totalPrice: totalPrice * 1.2, // Add tax
         items: cartItems.map(item => ({
           offerId: item.offerId,
           offerTitle: item.offerTitle || item.name,
           price: item.price,
           quantity: item.quantity
-        }))
+        })),
+        bankName: bankDetails.bankName,
+        iban: bankDetails.iban,
+        bic: bankDetails.bic
       });
 
       toast.success('Devis créé avec succès');

@@ -1,10 +1,11 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface BankDetails {
   bankName: string;
@@ -12,16 +13,52 @@ export interface BankDetails {
   bic: string;
 }
 
-export function BankDetailsForm({ onSubmit, isLoading = false }: { 
+export function BankDetailsForm({ onSubmit, isLoading = false, initialBankDetails = null }: { 
   onSubmit: (bankDetails: BankDetails) => void, 
-  isLoading?: boolean 
+  isLoading?: boolean,
+  initialBankDetails?: BankDetails | null
 }) {
   const { user } = useAuth();
   const [bankDetails, setBankDetails] = useState<BankDetails>({
-    bankName: '',
-    iban: '',
-    bic: '',
+    bankName: initialBankDetails?.bankName || '',
+    iban: initialBankDetails?.iban || '',
+    bic: initialBankDetails?.bic || '',
   });
+  const [fetchingDetails, setFetchingDetails] = useState(true);
+
+  // Fetch the user's bank details if not provided initially
+  useEffect(() => {
+    async function fetchBankDetails() {
+      if (!user?.id || initialBankDetails) {
+        setFetchingDetails(false);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('bank_name, iban, bic')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching bank details:', error);
+        } else if (data) {
+          setBankDetails({
+            bankName: data.bank_name || '',
+            iban: data.iban || '',
+            bic: data.bic || ''
+          });
+        }
+      } catch (err) {
+        console.error('Exception fetching bank details:', err);
+      } finally {
+        setFetchingDetails(false);
+      }
+    }
+    
+    fetchBankDetails();
+  }, [user, initialBankDetails]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +87,12 @@ export function BankDetailsForm({ onSubmit, isLoading = false }: {
     // Pass the bank details to the parent component
     onSubmit(bankDetails);
   };
+
+  if (fetchingDetails) {
+    return <div className="flex justify-center py-6">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-numa-500"></div>
+    </div>;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
