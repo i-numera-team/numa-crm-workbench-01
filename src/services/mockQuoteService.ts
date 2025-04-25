@@ -22,65 +22,7 @@ class MockQuoteService {
       iban: 'FR7630006000011234567890189',
       bic: 'BNPAFRPPXXX'
     },
-    {
-      id: 'QT002',
-      clientId: 'CL002',
-      clientName: 'TechStart Inc',
-      createdAt: '2024-04-16T10:15:00Z',
-      totalPrice: 7999.99,
-      status: 'pending',
-      agentName: 'Jane Agent',
-      dossierId: 'DOS002',
-      items: [
-        { offerId: 'OFF003', offerTitle: 'E-Commerce Solution', price: 5999.99, quantity: 1 },
-        { offerId: 'OFF004', offerTitle: 'Marketing Campaign', price: 1999.99, quantity: 1 }
-      ]
-    },
-    {
-      id: 'QT003',
-      clientId: 'CL003',
-      clientName: 'Global Services',
-      createdAt: '2024-04-17T11:45:00Z',
-      totalPrice: 2999.99,
-      status: 'rejected',
-      rejectedAt: '2024-04-19T16:20:00Z',
-      agentName: 'Bob Agent',
-      dossierId: 'DOS003',
-      items: [
-        { offerId: 'OFF005', offerTitle: 'Brand Strategy', price: 2999.99, quantity: 1 }
-      ]
-    },
-    {
-      id: 'QT004',
-      clientId: 'CL004',
-      clientName: 'First Bank',
-      createdAt: '2024-04-18T12:00:00Z',
-      totalPrice: 9999.99,
-      status: 'draft',
-      agentName: 'Alice Agent',
-      dossierId: 'DOS004',
-      items: [
-        { offerId: 'OFF006', offerTitle: 'Security Audit', price: 4999.99, quantity: 1 },
-        { offerId: 'OFF007', offerTitle: 'System Integration', price: 4999.99, quantity: 1 }
-      ]
-    },
-    {
-      id: 'QT005',
-      clientId: 'CL001',
-      clientName: 'Acme Corporation',
-      createdAt: '2024-04-19T13:10:00Z',
-      totalPrice: 1999.99,
-      status: 'approved',
-      agentName: 'John Agent',
-      updatedAt: '2024-04-20T09:30:00Z',
-      dossierId: 'DOS001',
-      items: [
-        { offerId: 'OFF008', offerTitle: 'Content Creation', price: 1999.99, quantity: 1 }
-      ],
-      bankName: 'Société Générale',
-      iban: 'FR7630007000011234567890144',
-      bic: 'SOGEFRPPXXX'
-    }
+   
   ];
 
   getQuotesByDossierId(dossierId: string): Quote[] {
