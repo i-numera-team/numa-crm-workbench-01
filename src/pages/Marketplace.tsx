@@ -8,6 +8,7 @@ import { ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import { CartItem } from '@/utils/mockData';
+import { toast } from 'sonner';
 
 interface Offer {
   id: string;
@@ -34,10 +35,10 @@ export default function Marketplace() {
     const fetchOffers = async () => {
       setIsLoading(true);
       try {
-        // Log allowed categories
+        // Récupérer les contraintes de catégorie
         const { data: categoryConstraint } = await supabase.functions.invoke('get-offer-category-constraint');
         if (categoryConstraint) {
-          console.log('Allowed categories:', categoryConstraint);
+          console.log('Category constraints:', categoryConstraint);
         }
         
         const { data, error } = await supabase
@@ -47,18 +48,20 @@ export default function Marketplace() {
           
         if (error) {
           console.error('Error fetching offers:', error);
+          toast.error("Impossible de charger les offres");
           return;
         }
         
         if (data) {
           setOffers(data);
           
-          // Extract unique categories
+          // Extraire les catégories uniques
           const uniqueCategories = Array.from(new Set(data.map(offer => offer.category)));
           setCategories(uniqueCategories);
         }
       } catch (error) {
         console.error('Exception fetching offers:', error);
+        toast.error("Une erreur est survenue lors du chargement des offres");
       } finally {
         setIsLoading(false);
       }
@@ -76,7 +79,7 @@ export default function Marketplace() {
   };
   
   const handleAddToCart = (offer: Offer) => {
-    // Create a CartItem from the Offer
+    // Créer un CartItem à partir de l'Offer
     const cartItem: CartItem = {
       offerId: offer.id,
       offerTitle: offer.name,
@@ -84,13 +87,15 @@ export default function Marketplace() {
       quantity: 1
     };
     addToCart(cartItem);
+    toast.success(`${offer.name} ajouté au panier`);
   };
   
   const handleRemoveFromCart = (offerId: string) => {
     removeFromCart(offerId);
+    toast.info("Offre retirée du panier");
   };
   
-  // Convert category to display name
+  // Convertir la catégorie en nom d'affichage
   const getCategoryDisplayName = (category: string) => {
     const categoryMap: Record<string, string> = {
       'site_internet': 'Sites Web',

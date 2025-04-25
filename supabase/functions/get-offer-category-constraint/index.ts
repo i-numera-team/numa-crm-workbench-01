@@ -22,9 +22,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data, error } = await supabaseClient.rpc('get_offer_category_constraint');
+    // Récupérer les informations sur la contrainte de vérification
+    const { data, error } = await supabaseClient
+      .from('pg_constraint')
+      .select('conname, consrc')
+      .eq('conname', 'offers_category_check')
+      .single();
 
-    if (error) throw error;
+    if (error) {
+      // Si nous ne trouvons pas la contrainte spécifique, essayons d'obtenir toutes les contraintes pour la table offers
+      const { data: allConstraints, error: allError } = await supabaseClient
+        .rpc('get_table_constraints', { table_name: 'offers' });
+      
+      if (allError) throw allError;
+      return new Response(JSON.stringify(allConstraints), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
