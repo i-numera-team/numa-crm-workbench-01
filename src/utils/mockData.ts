@@ -13,12 +13,14 @@ export { mockAnalyticsService } from '@/services/mockAnalyticsService';
 // Cette fonction est encore utilisée dans plusieurs fichiers, 
 // nous devons la rediriger vers les services appropriés
 export const mockDataService = {
+  // Quote methods
   getQuotes: () => mockQuoteService.getQuotes(),
   getQuotesByClientId: (clientId: string) => mockQuoteService.getQuotesByClientId(clientId),
   getQuoteById: (quoteId: string) => mockQuoteService.getQuoteById(quoteId),
   updateQuoteStatus: (quoteId: string, status: "draft" | "pending" | "approved" | "signed" | "rejected", userId: string, userName: string) => 
     mockQuoteService.updateQuoteStatus(quoteId, status, userId, userName),
   createQuote: (quoteData: any) => mockQuoteService.createQuote(quoteData),
+  getQuotesByDossierId: (dossierId: string) => mockQuoteService.getQuotesByDossierId(dossierId),
   
   // Dossier methods
   getDossierById: (id: string) => mockDossierService.getDossierById(id),
@@ -40,5 +42,4 @@ export const mockDataService = {
   getActivities: (limit: number) => mockAnalyticsService.getActivities(limit),
   getStats: () => mockAnalyticsService.getStats(),
   getMonthlyRevenue: () => mockAnalyticsService.getMonthlyRevenue(),
-  getQuotesByDossierId: (dossierId: string) => mockQuoteService.getQuotesByDossierId(dossierId),
 };
