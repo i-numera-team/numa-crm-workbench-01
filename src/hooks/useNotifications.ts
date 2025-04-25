@@ -28,46 +28,32 @@ export function useNotifications() {
       try {
         setLoading(true);
         
-        // Nous utilisons mockData temporairement, mais ici on pourrait
-        // récupérer les notifications depuis Supabase
-        const mockNotifications: Notification[] = [
-          {
-            id: '1',
-            userId: user.id,
-            message: 'Votre devis a été approuvé par l\'administrateur',
-            type: 'success',
-            read: false,
-            createdAt: new Date().toISOString(),
-            link: '/quotes/QT005',
-            title: 'Devis approuvé'
-          },
-          {
-            id: '2',
-            userId: user.id,
-            message: 'Bienvenue sur la plateforme i-numa!',
-            type: 'info',
-            read: true,
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            title: 'Bienvenue'
-          }
-        ];
+        // Récupération des notifications depuis Supabase
+        const { data: notificationsData, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
         
-        // Si l'utilisateur est admin, ajoutons une notification concernant un devis à approuver
-        if (user.role === 'admin') {
-          mockNotifications.push({
-            id: '3',
-            userId: user.id,
-            message: 'Un nouveau devis a été créé et est en attente d\'approbation',
-            type: 'warning',
-            read: false,
-            createdAt: new Date(Date.now() - 3600000).toISOString(),
-            link: '/quotes/QT002',
-            title: 'Nouveau devis'
-          });
+        if (error) {
+          console.error('Erreur lors du chargement des notifications:', error);
+          return;
         }
         
-        setNotifications(mockNotifications);
-        setUnreadCount(mockNotifications.filter(n => !n.read).length);
+        // Conversion des données Supabase au format attendu par l'application
+        const formattedNotifications: Notification[] = notificationsData.map(n => ({
+          id: n.id,
+          userId: n.user_id,
+          message: n.message,
+          type: n.type as 'info' | 'success' | 'warning' | 'error',
+          read: n.read || false,
+          createdAt: n.created_at,
+          link: n.link,
+          title: n.title
+        }));
+        
+        setNotifications(formattedNotifications);
+        setUnreadCount(formattedNotifications.filter(n => !n.read).length);
       } catch (error) {
         console.error('Erreur lors du chargement des notifications:', error);
       } finally {
@@ -77,12 +63,28 @@ export function useNotifications() {
 
     fetchNotifications();
     
-    // Configuration d'un canal temps réel pour les notifications (simulé pour l'instant)
+    // Configuration d'un canal temps réel pour les notifications
     const channel = supabase
       .channel('public:notifications')
-      .on('broadcast', { event: 'new_notification' }, payload => {
-        if (payload.payload.userId === user.id) {
-          const newNotification = payload.payload as Notification;
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, 
+        (payload) => {
+          const newNotification = {
+            id: payload.new.id,
+            userId: payload.new.user_id,
+            message: payload.new.message,
+            type: payload.new.type as 'info' | 'success' | 'warning' | 'error',
+            read: payload.new.read || false,
+            createdAt: payload.new.created_at,
+            link: payload.new.link,
+            title: payload.new.title
+          };
+          
           setNotifications(prev => [newNotification, ...prev]);
           setUnreadCount(count => count + 1);
           
@@ -91,7 +93,7 @@ export function useNotifications() {
             description: newNotification.title || 'Nouvelle notification'
           });
         }
-      })
+      )
       .subscribe();
 
     return () => {
@@ -99,37 +101,85 @@ export function useNotifications() {
     };
   }, [user]);
 
-  const markAsRead = (notificationId: string) => {
-    setNotifications(notifications.map(notification => {
-      if (notification.id === notificationId && !notification.read) {
-        setUnreadCount(count => count - 1);
-        return { ...notification, read: true };
+  const markAsRead = async (notificationId: string) => {
+    if (!user?.id) return;
+    
+    // Mettre à jour l'état local
+    const notificationToUpdate = notifications.find(n => n.id === notificationId);
+    if (notificationToUpdate && !notificationToUpdate.read) {
+      setNotifications(notifications.map(notification => {
+        if (notification.id === notificationId) {
+          setUnreadCount(count => count - 1);
+          return { ...notification, read: true };
+        }
+        return notification;
+      }));
+      
+      // Mettre à jour dans Supabase
+      try {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', notificationId)
+          .eq('user_id', user.id);
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour de la notification:', error);
       }
-      return notification;
-    }));
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notification => ({ ...notification, read: true })));
-    setUnreadCount(0);
-  };
-
-  const addNotification = (notification: Omit<Notification, 'id' | 'createdAt'>) => {
-    const newNotification = {
-      ...notification,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    
-    setNotifications(prev => [newNotification, ...prev]);
-    if (!newNotification.read) {
-      setUnreadCount(count => count + 1);
     }
+  };
+
+  const markAllAsRead = async () => {
+    if (!user?.id) return;
     
-    // Affichage d'un toast pour la nouvelle notification
-    toast.success(newNotification.message, {
-      description: newNotification.title || 'Nouvelle notification'
-    });
+    try {
+      // Mettre à jour l'état local
+      setNotifications(notifications.map(notification => ({ ...notification, read: true })));
+      setUnreadCount(0);
+      
+      // Mettre à jour dans Supabase
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des notifications:', error);
+    }
+  };
+
+  const addNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>) => {
+    if (!user?.id) return;
+    
+    try {
+      // Insérer dans Supabase
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: notification.userId,
+          message: notification.message,
+          type: notification.type,
+          read: notification.read,
+          title: notification.title,
+          link: notification.link
+        })
+        .select('*')
+        .single();
+      
+      if (error) {
+        console.error('Erreur lors de l\'ajout de la notification:', error);
+        return;
+      }
+      
+      // La notification sera ajoutée à l'état via le canal temps réel
+      console.log('Notification créée avec succès:', data);
+      
+      // Affichage d'un toast pour la nouvelle notification
+      toast.success(notification.message, {
+        description: notification.title || 'Nouvelle notification'
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout de la notification:', error);
+    }
   };
 
   return {

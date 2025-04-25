@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockDataService } from '@/utils/mockData';
 import { toast } from 'sonner';
 
 export function useQuoteData() {
@@ -37,7 +36,7 @@ export function useQuoteData() {
           });
         }
 
-        // Fetch offers from Supabase instead of using mock data
+        // Fetch offers from Supabase
         const { data: offersData, error: offersError } = await supabase
           .from('offers')
           .select('*');
@@ -50,20 +49,30 @@ export function useQuoteData() {
           setOffers(offersData || []);
         }
 
-        // For quotes, we still use mockDataService temporarily
-        // but in a real application, we would retrieve them from Supabase
-        let quoteData = [];
+        // Fetch quotes from Supabase
+        let quotesQuery = supabase.from('quotes').select(`
+          *,
+          quote_items(*),
+          dossiers!inner(
+            client_id,
+            agent_id
+          )
+        `);
         
+        // Clients can only see their own quotes
         if (user.role === 'client') {
-          // Client users can only see their own quotes
-          quoteData = mockDataService.getQuotes().filter(q => q.clientId === user.id);
-        } else {
-          // Admins and agents can see all quotes
-          quoteData = mockDataService.getQuotes();
+          quotesQuery = quotesQuery.eq('dossiers.client_id', user.id);
         }
         
-        console.log('Devis récupérés pour', user.role, ':', quoteData.length);
-        setQuotes(quoteData || []);
+        const { data: quotesData, error: quotesError } = await quotesQuery;
+        
+        if (quotesError) {
+          console.error('Erreur lors de la récupération des devis:', quotesError);
+          toast.error('Erreur lors du chargement des devis');
+        } else {
+          console.log('Devis récupérés:', quotesData);
+          setQuotes(quotesData || []);
+        }
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);
         toast.error('Une erreur est survenue lors du chargement des données');
