@@ -5,7 +5,7 @@ import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, Outlet } from 'react-router-dom';
 import { UserRole } from '@/types/auth';
-import { useMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ProtectedLayoutProps {
   allowedRoles?: UserRole[];
@@ -14,7 +14,7 @@ interface ProtectedLayoutProps {
 export default function Layout({ allowedRoles = ['client', 'agent', 'admin'] }: ProtectedLayoutProps) {
   const { isAuthenticated, hasAccess, isLoading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
 
   // Fermer automatiquement la sidebar sur mobile lors du changement de route
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function Layout({ allowedRoles = ['client', 'agent', 'admin'] }: 
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#181925]">
-      <Sidebar isOpen={isSidebarOpen} />
+      <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
           isSidebarOpen={isSidebarOpen} 

@@ -87,7 +87,7 @@ export default function QuoteDetail() {
           }
         }
         
-        const formattedQuote = {
+        const formattedQuote: Quote = {
           id: quoteData.id,
           clientId: quoteData.dossiers.client_id,
           clientName: clientData?.company || clientData?.email.split('@')[0] || 'Client',
@@ -97,11 +97,13 @@ export default function QuoteDetail() {
           createdAt: quoteData.created_at,
           updatedAt: quoteData.updated_at,
           totalPrice: quoteData.total_price,
-          status: quoteData.status,
+          status: quoteData.status as Quote['status'],
           dossierId: quoteData.dossier_id,
           bankName: quoteData.bank_name || '',
           iban: quoteData.iban || '',
           bic: quoteData.bic || '',
+          signedAt: quoteData.signed_at || undefined,
+          rejectedAt: quoteData.rejected_at || undefined,
           items: quoteData.quote_items.map(item => ({
             offerId: item.offer_id,
             offerTitle: item.offer_title || 'Produit',
@@ -112,9 +114,9 @@ export default function QuoteDetail() {
         
         setQuote(formattedQuote);
         setBankDetails({
-          bankName: formattedQuote.bankName,
-          iban: formattedQuote.iban,
-          bic: formattedQuote.bic
+          bankName: formattedQuote.bankName || '',
+          iban: formattedQuote.iban || '',
+          bic: formattedQuote.bic || ''
         });
         
       } catch (error) {
@@ -189,7 +191,8 @@ export default function QuoteDetail() {
         .from('quotes')
         .update({
           status: 'signed',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          signed_at: new Date().toISOString()
         })
         .eq('id', quote.id);
       
@@ -200,7 +203,8 @@ export default function QuoteDetail() {
       setQuote({
         ...quote,
         status: 'signed',
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        signedAt: new Date().toISOString()
       });
       
       toast.success('Devis signé avec succès');
@@ -244,7 +248,8 @@ export default function QuoteDetail() {
         .from('quotes')
         .update({
           status: 'rejected',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          rejected_at: new Date().toISOString()
         })
         .eq('id', quote.id);
       
@@ -255,7 +260,8 @@ export default function QuoteDetail() {
       setQuote({
         ...quote,
         status: 'rejected',
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        rejectedAt: new Date().toISOString()
       });
       
       toast.success('Devis rejeté avec succès');
